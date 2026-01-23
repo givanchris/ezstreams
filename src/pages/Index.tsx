@@ -3,7 +3,8 @@ import Header from "@/components/Header";
 import SearchBar from "@/components/SearchBar";
 import StreamingServiceCard from "@/components/StreamingServiceCard";
 import ContentCard from "@/components/ContentCard";
-import { ArrowRight, Sparkles, Zap, Shield } from "lucide-react";
+import SavingsAnalyzer from "@/components/SavingsAnalyzer";
+import { ArrowRight, Sparkles, Zap, Shield, PiggyBank } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const streamingServices = [
@@ -66,8 +67,18 @@ const featuredContent = [
   },
 ];
 
+// Mock usage data for the savings analyzer
+const platformUsageData = [
+  { id: "netflix", name: "Netflix", logo: "N", color: "#E50914", monthlyPrice: 15.49, usagePercent: 45, showsWatched: 12, recommendation: "keep" as const },
+  { id: "hulu", name: "Hulu", logo: "H", color: "#1CE783", monthlyPrice: 17.99, usagePercent: 72, showsWatched: 18, recommendation: "keep" as const },
+  { id: "disney", name: "Disney+", logo: "D+", color: "#113CCF", monthlyPrice: 13.99, usagePercent: 28, showsWatched: 5, recommendation: "consider" as const },
+  { id: "hbo", name: "HBO Max", logo: "HBO", color: "#5822B4", monthlyPrice: 15.99, usagePercent: 8, showsWatched: 2, recommendation: "cancel" as const },
+  { id: "prime", name: "Prime Video", logo: "P", color: "#00A8E1", monthlyPrice: 8.99, usagePercent: 5, showsWatched: 1, recommendation: "cancel" as const },
+  { id: "apple", name: "Apple TV+", logo: "🍎", color: "#555555", monthlyPrice: 9.99, usagePercent: 3, showsWatched: 0, recommendation: "cancel" as const },
+];
+
 const Index = () => {
-  const [connectedServices, setConnectedServices] = useState<string[]>(["netflix", "disney"]);
+  const [connectedServices, setConnectedServices] = useState<string[]>(["netflix", "disney", "hulu", "hbo", "prime", "apple"]);
   const [searchQuery, setSearchQuery] = useState("");
 
   const toggleService = (serviceId: string) => {
@@ -196,12 +207,32 @@ const Index = () => {
         </div>
       </section>
 
+      {/* Savings Analyzer Section */}
+      <section className="py-16 px-6">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center gap-2 mb-4 streaming-badge">
+              <PiggyBank className="w-4 h-4 text-accent" />
+              <span>Smart subscription optimization</span>
+            </div>
+            <h2 className="font-display text-3xl font-bold text-foreground mb-2">
+              Stop Wasting Money on Unused Subscriptions
+            </h2>
+            <p className="text-muted-foreground">
+              Our algorithm analyzes your viewing habits to show you exactly which services deliver value
+            </p>
+          </div>
+
+          <SavingsAnalyzer platforms={platformUsageData.filter(p => connectedServices.includes(p.id))} />
+        </div>
+      </section>
+
       {/* Features Section */}
       <section className="py-20 px-6">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="font-display text-4xl font-bold text-foreground mb-4">
-              Why StreamHub?
+              Why EZstream?
             </h2>
             <p className="text-muted-foreground max-w-xl mx-auto">
               The ultimate streaming companion for cord-cutters everywhere
@@ -216,9 +247,9 @@ const Index = () => {
                 description: "Find any movie or show across all your platforms in seconds. No more app-hopping.",
               },
               {
-                icon: Sparkles,
-                title: "Smart Recommendations",
-                description: "Personalized suggestions based on your viewing history and connected services.",
+                icon: PiggyBank,
+                title: "Save Money",
+                description: "Our smart analyzer identifies subscriptions you're not using so you can cut the waste.",
               },
               {
                 icon: Shield,
@@ -277,9 +308,9 @@ const Index = () => {
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-orange-400 flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-sm">S</span>
+              <span className="text-primary-foreground font-bold text-sm">EZ</span>
             </div>
-            <span className="font-display font-semibold text-foreground">StreamHub</span>
+            <span className="font-display font-semibold text-foreground">EZstream</span>
           </div>
           
           <nav className="flex flex-wrap justify-center gap-6 text-sm text-muted-foreground">
@@ -290,7 +321,7 @@ const Index = () => {
           </nav>
           
           <p className="text-sm text-muted-foreground">
-            © 2024 StreamHub. All rights reserved.
+            © 2024 EZstream. All rights reserved.
           </p>
         </div>
       </footer>
