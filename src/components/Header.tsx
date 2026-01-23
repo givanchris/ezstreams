@@ -15,7 +15,7 @@ const Header = () => {
               <Tv className="w-5 h-5 text-primary-foreground" />
             </div>
             <span className="font-display font-bold text-xl text-foreground">
-              Stream<span className="text-gradient">Hub</span>
+              EZ<span className="text-gradient">stream</span>
             </span>
           </div>
 
