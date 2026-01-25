@@ -1,5 +1,6 @@
 import { Tv, Menu, X } from "lucide-react";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "./ui/button";
 
 const Header = () => {
@@ -37,11 +38,11 @@ const Header = () => {
 
           {/* Actions */}
           <div className="hidden md:flex items-center gap-3">
-            <Button variant="glass" size="sm">
-              Sign In
+            <Button variant="glass" size="sm" asChild>
+              <Link to="/login">Sign In</Link>
             </Button>
-            <Button variant="hero" size="sm">
-              Get Started
+            <Button variant="hero" size="sm" asChild>
+              <Link to="/signup">Get Started</Link>
             </Button>
           </div>
 
@@ -71,11 +72,11 @@ const Header = () => {
                 My List
               </a>
               <div className="flex gap-3 pt-3 border-t border-border">
-                <Button variant="glass" size="sm" className="flex-1">
-                  Sign In
+                <Button variant="glass" size="sm" className="flex-1" asChild>
+                  <Link to="/login">Sign In</Link>
                 </Button>
-                <Button variant="hero" size="sm" className="flex-1">
-                  Get Started
+                <Button variant="hero" size="sm" className="flex-1" asChild>
+                  <Link to="/signup">Get Started</Link>
                 </Button>
               </div>
             </nav>

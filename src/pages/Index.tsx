@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import Header from "@/components/Header";
 import SearchBar from "@/components/SearchBar";
 import StreamingServiceCard from "@/components/StreamingServiceCard";
@@ -78,6 +79,7 @@ const platformUsageData = [
 ];
 
 const Index = () => {
+  const navigate = useNavigate();
   const [connectedServices, setConnectedServices] = useState<string[]>(["netflix", "disney", "hulu", "hbo", "prime", "apple"]);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -91,7 +93,7 @@ const Index = () => {
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
-    console.log("Searching for:", query);
+    navigate("/search");
   };
 
   return (
@@ -291,11 +293,11 @@ const Index = () => {
                 Join thousands of users who've already streamlined their entertainment experience.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Button variant="hero" size="lg">
-                  Get Started Free
+                <Button variant="hero" size="lg" asChild>
+                  <Link to="/signup">Get Started Free</Link>
                 </Button>
-                <Button variant="glass" size="lg">
-                  Learn More
+                <Button variant="glass" size="lg" asChild>
+                  <Link to="/search">Learn More</Link>
                 </Button>
               </div>
             </div>
