@@ -15,8 +15,9 @@ serve(async (req) => {
 
   try {
     const apiKey = Deno.env.get('TMDB_API_KEY');
-    if (!apiKey) {
-      console.error("TMDB_API_KEY not configured");
+    
+    if (!apiKey || apiKey.trim() === '') {
+      console.error("TMDB_API_KEY is missing or empty. Please configure the TMDB_API_KEY secret in your Supabase project.");
       return new Response(
         JSON.stringify({ error: "TMDB API key not configured" }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -33,21 +34,38 @@ serve(async (req) => {
       );
     }
 
-    // Build TMDB URL with all query params except 'endpoint'
+    // Build TMDB URL
     const tmdbUrl = new URL(`${TMDB_BASE_URL}${endpoint}`);
-    tmdbUrl.searchParams.set('api_key', apiKey);
     
-    // Forward other query params
+    // Forward other query params (except 'endpoint')
     url.searchParams.forEach((value, key) => {
       if (key !== 'endpoint') {
         tmdbUrl.searchParams.set(key, value);
       }
     });
 
-    console.log(`Proxying request to: ${endpoint}`);
+    // Determine auth method: v4 Access Token (JWT-like) vs v3 API Key
+    const isV4Token = apiKey.startsWith('eyJ');
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
 
-    const response = await fetch(tmdbUrl.toString());
+    if (isV4Token) {
+      // v4 Access Token: use Bearer auth header
+      headers['Authorization'] = `Bearer ${apiKey}`;
+      console.log(`Proxying request to: ${endpoint} (using v4 Bearer token)`);
+    } else {
+      // v3 API Key: add as query parameter
+      tmdbUrl.searchParams.set('api_key', apiKey);
+      console.log(`Proxying request to: ${endpoint} (using v3 API key)`);
+    }
+
+    const response = await fetch(tmdbUrl.toString(), { headers });
     const data = await response.json();
+
+    if (!response.ok) {
+      console.error(`TMDB API error: ${response.status}`, data);
+    }
 
     return new Response(
       JSON.stringify(data),
