@@ -17,21 +17,44 @@ serve(async (req) => {
     const apiKey = Deno.env.get('TMDB_API_KEY');
     
     if (!apiKey || apiKey.trim() === '') {
-      console.error("TMDB_API_KEY is missing or empty. Please configure the TMDB_API_KEY secret in your Supabase project.");
+      console.error(
+        "TMDB_API_KEY is missing or empty. Set the TMDB_API_KEY secret (v3 API key or v4 access token)."
+      );
       return new Response(
-        JSON.stringify({ error: "TMDB API key not configured" }),
+        JSON.stringify({ error: "TMDB_API_KEY not set" }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     const url = new URL(req.url);
-    const endpoint = url.searchParams.get('endpoint');
+    const endpointRaw = url.searchParams.get('endpoint');
     
-    if (!endpoint) {
+    if (!endpointRaw || endpointRaw.trim() === '') {
       return new Response(
-        JSON.stringify({ error: "Missing endpoint parameter" }),
+        JSON.stringify({
+          error: "Missing endpoint parameter",
+          example: "/tmdb-proxy?endpoint=/search/movie&query=Dune",
+        }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Normalize endpoint to prevent double `/3` and ensure it starts with `/`
+    let endpoint = endpointRaw.trim();
+    // If someone passes a full TMDB URL, extract the path/query part.
+    if (endpoint.startsWith('http://') || endpoint.startsWith('https://')) {
+      try {
+        const u = new URL(endpoint);
+        endpoint = u.pathname + (u.search ?? '');
+      } catch {
+        // keep as-is if not a valid URL
+      }
+    }
+    if (endpoint.startsWith('/3')) {
+      endpoint = endpoint.replace(/^\/3/, '');
+    }
+    if (!endpoint.startsWith('/')) {
+      endpoint = `/${endpoint}`;
     }
 
     // Build TMDB URL
@@ -45,12 +68,12 @@ serve(async (req) => {
     });
 
     // Determine auth method: v4 Access Token (JWT-like) vs v3 API Key
-    const isV4Token = apiKey.startsWith('eyJ');
+    const isJwtLike = apiKey.startsWith('eyJ') || (apiKey.match(/\./g)?.length ?? 0) === 2;
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
 
-    if (isV4Token) {
+    if (isJwtLike) {
       // v4 Access Token: use Bearer auth header
       headers['Authorization'] = `Bearer ${apiKey}`;
       console.log(`Proxying request to: ${endpoint} (using v4 Bearer token)`);
