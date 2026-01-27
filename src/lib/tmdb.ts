@@ -50,16 +50,8 @@ export const getImageUrl = (path: string | null, size: "w92" | "w154" | "w185" |
 
 async function tmdbFetch<T>(endpoint: string, params: Record<string, string> = {}): Promise<T> {
   const searchParams = new URLSearchParams({ endpoint, ...params });
-  
-  const { data, error } = await supabase.functions.invoke('tmdb-proxy', {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: null,
-  });
 
-  // supabase.functions.invoke doesn't support query params directly, so we use fetch
+  // NOTE: We call the function with query params; all calls MUST include `endpoint`.
   const projectUrl = import.meta.env.VITE_SUPABASE_URL;
   const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
   
