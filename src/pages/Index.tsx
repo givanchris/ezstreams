@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import Header from "@/components/Header";
 import SearchBar from "@/components/SearchBar";
 import StreamingServiceCard from "@/components/StreamingServiceCard";
 import ContentCard from "@/components/ContentCard";
@@ -97,8 +96,7 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen">
-      <Header />
+    <div className="min-h-screen pt-20">
 
       {/* Hero Section */}
       <section className="relative pt-32 pb-20 px-6 overflow-hidden">
@@ -153,8 +151,8 @@ const Index = () => {
                 Connect your subscriptions to see personalized results
               </p>
             </div>
-            <Button variant="ghost" className="text-primary">
-              Manage all <ArrowRight className="w-4 h-4 ml-1" />
+            <Button variant="ghost" className="text-primary" asChild>
+              <Link to="/profile">Manage all <ArrowRight className="w-4 h-4 ml-1" /></Link>
             </Button>
           </div>
 
@@ -190,8 +188,8 @@ const Index = () => {
                 Available on your connected services
               </p>
             </div>
-            <Button variant="ghost" className="text-primary">
-              View all <ArrowRight className="w-4 h-4 ml-1" />
+            <Button variant="ghost" className="text-primary" asChild>
+              <Link to="/movies">View all <ArrowRight className="w-4 h-4 ml-1" /></Link>
             </Button>
           </div>
 
