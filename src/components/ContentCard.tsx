@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { Play, Star } from "lucide-react";
 
 interface ContentCardProps {
@@ -7,6 +8,7 @@ interface ContentCardProps {
   year: string;
   type: "movie" | "series";
   streamingServices: string[];
+  id?: number;
 }
 
 const serviceColors: Record<string, string> = {
@@ -27,9 +29,14 @@ const ContentCard = ({
   year,
   type,
   streamingServices,
+  id,
 }: ContentCardProps) => {
+  // Generate a deterministic ID from title if none provided (for demo content)
+  const contentId = id || Math.abs(title.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0));
+  const linkPath = type === "movie" ? `/movie/${contentId}` : `/series/${contentId}`;
+
   return (
-    <div className="content-card group">
+    <Link to={linkPath} className="content-card group block">
       <div className="aspect-[2/3] relative overflow-hidden">
         <img
           src={image}
@@ -60,7 +67,7 @@ const ContentCard = ({
       </div>
 
       <div className="p-4">
-        <h3 className="font-display font-semibold text-foreground truncate mb-1">
+        <h3 className="font-display font-semibold text-foreground truncate mb-1 group-hover:text-primary transition-colors">
           {title}
         </h3>
         <p className="text-sm text-muted-foreground mb-3">{year}</p>
@@ -82,7 +89,7 @@ const ContentCard = ({
           ))}
         </div>
       </div>
-    </div>
+    </Link>
   );
 };
 
