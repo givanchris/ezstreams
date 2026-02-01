@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,6 +8,10 @@ const corsHeaders = {
 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 
+// Input validation constants
+const MAX_QUERY_LENGTH = 200;
+const ENDPOINT_PATTERN = /^\/[a-z0-9\/_-]+$/i;
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -14,6 +19,38 @@ serve(async (req) => {
   }
 
   try {
+    // === AUTHENTICATION CHECK ===
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      console.error("Missing or invalid Authorization header");
+      return new Response(
+        JSON.stringify({ error: "Unauthorized - Missing authentication token" }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Create Supabase client and verify the JWT
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    
+    if (claimsError || !claimsData?.claims) {
+      console.error("JWT verification failed:", claimsError?.message);
+      return new Response(
+        JSON.stringify({ error: "Unauthorized - Invalid token" }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const userId = claimsData.claims.sub;
+    console.log(`Authenticated request from user: ${userId}`);
+
+    // === API KEY CHECK ===
     const apiKey = Deno.env.get('TMDB_API_KEY');
     
     if (!apiKey || apiKey.trim() === '') {
@@ -39,8 +76,10 @@ serve(async (req) => {
       );
     }
 
+    // === INPUT VALIDATION ===
     // Normalize endpoint to prevent double `/3` and ensure it starts with `/`
     let endpoint = endpointRaw.trim();
+    
     // If someone passes a full TMDB URL, extract the path/query part.
     if (endpoint.startsWith('http://') || endpoint.startsWith('https://')) {
       try {
@@ -55,6 +94,25 @@ serve(async (req) => {
     }
     if (!endpoint.startsWith('/')) {
       endpoint = `/${endpoint}`;
+    }
+
+    // Validate endpoint format to prevent injection
+    if (!ENDPOINT_PATTERN.test(endpoint)) {
+      console.error(`Invalid endpoint format: ${endpoint}`);
+      return new Response(
+        JSON.stringify({ error: "Invalid endpoint format" }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate query parameter length
+    const queryParam = url.searchParams.get('query');
+    if (queryParam && queryParam.length > MAX_QUERY_LENGTH) {
+      console.error(`Query too long: ${queryParam.length} characters`);
+      return new Response(
+        JSON.stringify({ error: `Query too long, maximum ${MAX_QUERY_LENGTH} characters allowed` }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Build TMDB URL
@@ -76,11 +134,11 @@ serve(async (req) => {
     if (isJwtLike) {
       // v4 Access Token: use Bearer auth header
       headers['Authorization'] = `Bearer ${apiKey}`;
-      console.log(`Proxying request to: ${endpoint} (using v4 Bearer token)`);
+      console.log(`Proxying request to: ${endpoint} (using v4 Bearer token) for user: ${userId}`);
     } else {
       // v3 API Key: add as query parameter
       tmdbUrl.searchParams.set('api_key', apiKey);
-      console.log(`Proxying request to: ${endpoint} (using v3 API key)`);
+      console.log(`Proxying request to: ${endpoint} (using v3 API key) for user: ${userId}`);
     }
 
     const response = await fetch(tmdbUrl.toString(), { headers });
@@ -99,9 +157,9 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error("Error in tmdb-proxy:", error);
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    // Return generic error message to client (don't expose internal details)
     return new Response(
-      JSON.stringify({ error: "Failed to fetch from TMDB", details: errorMessage }),
+      JSON.stringify({ error: "Failed to fetch from TMDB" }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
