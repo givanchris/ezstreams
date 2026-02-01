@@ -16,6 +16,7 @@ import Lists from "./pages/Lists";
 import Profile from "./pages/Profile";
 import MovieDetails from "./pages/MovieDetails";
 import SeriesDetails from "./pages/SeriesDetails";
+import TvDetails from "./pages/TvDetails";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -85,6 +86,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <SeriesDetails />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/tv/:id"
+              element={
+                <ProtectedRoute>
+                  <TvDetails />
                 </ProtectedRoute>
               }
             />

@@ -33,7 +33,7 @@ const ContentCard = ({
 }: ContentCardProps) => {
   // Generate a deterministic ID from title if none provided (for demo content)
   const contentId = id || Math.abs(title.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0));
-  const linkPath = type === "movie" ? `/movie/${contentId}` : `/series/${contentId}`;
+  const linkPath = type === "movie" ? `/movie/${contentId}` : `/tv/${contentId}`;
 
   return (
     <Link to={linkPath} className="content-card group block">

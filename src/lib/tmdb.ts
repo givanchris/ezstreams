@@ -15,9 +15,26 @@ export interface TMDBMovie {
   tagline?: string;
 }
 
-export interface TMDBSearchResponse {
+export interface TMDBTvShow {
+  id: number;
+  name: string;
+  overview: string;
+  poster_path: string | null;
+  backdrop_path: string | null;
+  first_air_date: string;
+  vote_average: number;
+  vote_count: number;
+  genre_ids?: number[];
+  genres?: { id: number; name: string }[];
+  number_of_seasons?: number;
+  number_of_episodes?: number;
+  status?: string;
+  tagline?: string;
+}
+
+export interface TMDBSearchResponse<T = TMDBMovie> {
   page: number;
-  results: TMDBMovie[];
+  results: T[];
   total_pages: number;
   total_results: number;
 }
@@ -52,17 +69,49 @@ export const getImageUrl = (path: string | null, size: "w92" | "w154" | "w185" |
 const MAX_QUERY_LENGTH = 200;
 const MIN_QUERY_LENGTH = 2;
 
-async function tmdbFetch<T>(endpoint: string, params: Record<string, string> = {}): Promise<T> {
+// Simple in-memory cache for session
+const cache = new Map<string, { data: unknown; timestamp: number }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+function getCacheKey(endpoint: string, params: Record<string, string>): string {
+  const sortedParams = Object.entries(params).sort(([a], [b]) => a.localeCompare(b));
+  return `${endpoint}:${JSON.stringify(sortedParams)}`;
+}
+
+function getFromCache<T>(key: string): T | null {
+  const entry = cache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > CACHE_TTL) {
+    cache.delete(key);
+    return null;
+  }
+  return entry.data as T;
+}
+
+function setCache<T>(key: string, data: T): void {
+  cache.set(key, { data, timestamp: Date.now() });
+}
+
+export async function tmdbFetch<T>(endpoint: string, params: Record<string, string> = {}, useCache = true): Promise<T> {
+  const cacheKey = getCacheKey(endpoint, params);
+  
+  if (useCache) {
+    const cached = getFromCache<T>(cacheKey);
+    if (cached) {
+      console.log('[TMDB Cache] Hit:', cacheKey);
+      return cached;
+    }
+  }
+  
   const searchParams = new URLSearchParams({ endpoint, ...params });
 
-  // NOTE: We call the function with query params; all calls MUST include `endpoint`.
   const projectUrl = import.meta.env.VITE_SUPABASE_URL;
   
   // Get the current user's session token for authenticated requests
   const { data: { session } } = await supabase.auth.getSession();
   
   if (!session?.access_token) {
-    throw new Error('Authentication required. Please log in to search movies.');
+    throw new Error('Authentication required. Please log in to browse content.');
   }
   
   const response = await fetch(
@@ -80,10 +129,16 @@ async function tmdbFetch<T>(endpoint: string, params: Record<string, string> = {
     throw new Error(errorData.error || `TMDB request failed: ${response.status}`);
   }
 
-  return response.json();
+  const data = await response.json();
+  
+  if (useCache) {
+    setCache(cacheKey, data);
+  }
+  
+  return data;
 }
 
-export async function searchMovies(query: string, page = 1): Promise<TMDBSearchResponse> {
+export async function searchMovies(query: string, page = 1): Promise<TMDBSearchResponse<TMDBMovie>> {
   // Client-side validation
   const trimmed = query.trim();
   if (!trimmed || trimmed.length < MIN_QUERY_LENGTH) {
@@ -93,7 +148,7 @@ export async function searchMovies(query: string, page = 1): Promise<TMDBSearchR
     throw new Error(`Search query too long, maximum ${MAX_QUERY_LENGTH} characters`);
   }
   
-  return tmdbFetch<TMDBSearchResponse>('/search/movie', { 
+  return tmdbFetch<TMDBSearchResponse<TMDBMovie>>('/search/movie', { 
     query: trimmed, 
     page: page.toString(),
     include_adult: 'false'
@@ -114,6 +169,31 @@ export async function getWatchProviders(movieId: number): Promise<WatchProviders
     throw new Error('Invalid movie ID');
   }
   return tmdbFetch<WatchProvidersResponse>(`/movie/${movieId}/watch/providers`);
+}
+
+// TV Show specific functions
+export async function getTvDetails(tvId: number): Promise<TMDBTvShow> {
+  if (!Number.isInteger(tvId) || tvId <= 0) {
+    throw new Error('Invalid TV show ID');
+  }
+  return tmdbFetch<TMDBTvShow>(`/tv/${tvId}`);
+}
+
+export async function getTvWatchProviders(tvId: number): Promise<WatchProvidersResponse> {
+  if (!Number.isInteger(tvId) || tvId <= 0) {
+    throw new Error('Invalid TV show ID');
+  }
+  return tmdbFetch<WatchProvidersResponse>(`/tv/${tvId}/watch/providers`);
+}
+
+// Generic fetch for trending/popular/top_rated
+export async function fetchMediaList<T>(
+  endpoint: string, 
+  page = 1
+): Promise<TMDBSearchResponse<T>> {
+  return tmdbFetch<TMDBSearchResponse<T>>(endpoint, { 
+    page: page.toString() 
+  });
 }
 
 // Provider URL mapping for deep links / search fallbacks
