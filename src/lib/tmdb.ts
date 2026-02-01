@@ -48,18 +48,28 @@ export const getImageUrl = (path: string | null, size: "w92" | "w154" | "w185" |
   return `${TMDB_IMAGE_BASE}/${size}${path}`;
 };
 
+// Input validation constants
+const MAX_QUERY_LENGTH = 200;
+const MIN_QUERY_LENGTH = 2;
+
 async function tmdbFetch<T>(endpoint: string, params: Record<string, string> = {}): Promise<T> {
   const searchParams = new URLSearchParams({ endpoint, ...params });
 
   // NOTE: We call the function with query params; all calls MUST include `endpoint`.
   const projectUrl = import.meta.env.VITE_SUPABASE_URL;
-  const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  
+  // Get the current user's session token for authenticated requests
+  const { data: { session } } = await supabase.auth.getSession();
+  
+  if (!session?.access_token) {
+    throw new Error('Authentication required. Please log in to search movies.');
+  }
   
   const response = await fetch(
     `${projectUrl}/functions/v1/tmdb-proxy?${searchParams.toString()}`,
     {
       headers: {
-        'Authorization': `Bearer ${anonKey}`,
+        'Authorization': `Bearer ${session.access_token}`,
         'Content-Type': 'application/json',
       },
     }
@@ -74,18 +84,35 @@ async function tmdbFetch<T>(endpoint: string, params: Record<string, string> = {
 }
 
 export async function searchMovies(query: string, page = 1): Promise<TMDBSearchResponse> {
+  // Client-side validation
+  const trimmed = query.trim();
+  if (!trimmed || trimmed.length < MIN_QUERY_LENGTH) {
+    throw new Error(`Search query must be at least ${MIN_QUERY_LENGTH} characters`);
+  }
+  if (trimmed.length > MAX_QUERY_LENGTH) {
+    throw new Error(`Search query too long, maximum ${MAX_QUERY_LENGTH} characters`);
+  }
+  
   return tmdbFetch<TMDBSearchResponse>('/search/movie', { 
-    query, 
+    query: trimmed, 
     page: page.toString(),
     include_adult: 'false'
   });
 }
 
 export async function getMovieDetails(movieId: number): Promise<TMDBMovie> {
+  // Validate movie ID is a positive integer
+  if (!Number.isInteger(movieId) || movieId <= 0) {
+    throw new Error('Invalid movie ID');
+  }
   return tmdbFetch<TMDBMovie>(`/movie/${movieId}`);
 }
 
 export async function getWatchProviders(movieId: number): Promise<WatchProvidersResponse> {
+  // Validate movie ID is a positive integer
+  if (!Number.isInteger(movieId) || movieId <= 0) {
+    throw new Error('Invalid movie ID');
+  }
   return tmdbFetch<WatchProvidersResponse>(`/movie/${movieId}/watch/providers`);
 }
 
