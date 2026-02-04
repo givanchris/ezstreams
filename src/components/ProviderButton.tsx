@@ -1,6 +1,7 @@
 import { ExternalLink } from "lucide-react";
 import { WatchProvider, getImageUrl, getProviderUrl } from "@/lib/tmdb";
 import { Button } from "@/components/ui/button";
+import { isAmazonProvider, getAffiliateUrl } from "@/lib/amazon-affiliate";
 
 interface ProviderButtonProps {
   provider: WatchProvider;
@@ -18,11 +19,25 @@ const categoryColors = {
 
 const ProviderButton = ({ provider, category, movieTitle, movieYear, tmdbLink }: ProviderButtonProps) => {
   const logoUrl = getImageUrl(provider.logo_path, "w92");
-  const providerUrl = getProviderUrl(provider.provider_name, movieTitle, movieYear);
+  const fallbackProviderUrl = getProviderUrl(provider.provider_name, movieTitle, movieYear);
+  
+  // Determine the outbound URL with Amazon affiliate logic
+  const getOutboundUrl = (): string => {
+    const baseUrl = tmdbLink || fallbackProviderUrl;
+    
+    // For Amazon providers, apply affiliate tagging logic
+    if (isAmazonProvider(provider.provider_name)) {
+      return getAffiliateUrl(provider.provider_name, baseUrl, movieTitle, movieYear);
+    }
+    
+    // For non-Amazon providers, use the original URL
+    return baseUrl;
+  };
 
   const handleClick = () => {
-    // Prefer TMDB's link if available, otherwise use our provider URL
-    window.open(tmdbLink || providerUrl, '_blank', 'noopener,noreferrer');
+    const outboundUrl = getOutboundUrl();
+    // All outbound links open in new tab with security attributes
+    window.open(outboundUrl, '_blank', 'noopener,noreferrer');
   };
 
   return (

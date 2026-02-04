@@ -4,6 +4,7 @@ import { ArrowLeft, Star, Calendar, ExternalLink, Tv2, Layers } from "lucide-rea
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import ProviderButton from "@/components/ProviderButton";
+import AffiliateDisclosure from "@/components/AffiliateDisclosure";
 import { 
   getTvDetails, 
   getTvWatchProviders, 
@@ -301,6 +302,7 @@ const TvDetails = () => {
                 <p className="text-muted-foreground/70 text-sm text-center mt-4">
                   Availability varies by region. Data provided by JustWatch via TMDB.
                 </p>
+                <AffiliateDisclosure />
               </div>
             ) : (
               <div className="text-center py-8">

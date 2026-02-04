@@ -4,6 +4,7 @@ import { ArrowLeft, Star, Clock, Calendar, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import ProviderButton from "@/components/ProviderButton";
+import AffiliateDisclosure from "@/components/AffiliateDisclosure";
 import { 
   getMovieDetails, 
   getWatchProviders, 
@@ -281,6 +282,7 @@ const MovieDetails = () => {
                 <p className="text-muted-foreground/70 text-sm text-center mt-4">
                   Availability varies by region. Data provided by JustWatch via TMDB.
                 </p>
+                <AffiliateDisclosure />
               </div>
             ) : (
               <div className="text-center py-8">

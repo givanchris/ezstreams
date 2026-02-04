@@ -324,6 +324,9 @@ const Index = () => {
             © 2024 EZstream. All rights reserved.
           </p>
         </div>
+        <p className="text-center text-xs text-muted-foreground/70 mt-6">
+          As an Amazon Associate, we may earn from qualifying purchases.
+        </p>
       </footer>
     </div>
   );
