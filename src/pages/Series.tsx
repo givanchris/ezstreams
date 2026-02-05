@@ -1,5 +1,6 @@
 import { Tv2 } from "lucide-react";
 import TabbedMediaGrid, { getDefaultTabs } from "@/components/TabbedMediaGrid";
+import RecentlyViewedRow from "@/components/RecentlyViewedRow";
 
 const Series = () => {
   const tabs = getDefaultTabs("tv");
@@ -21,6 +22,11 @@ const Series = () => {
           <p className="text-muted-foreground text-lg max-w-md mx-auto">
             Browse TV shows across all your streaming platforms
           </p>
+        </div>
+
+        {/* Recently Viewed */}
+        <div className="mb-12">
+          <RecentlyViewedRow showClear={false} />
         </div>
 
         {/* Tabbed Grid */}

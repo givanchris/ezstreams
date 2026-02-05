@@ -1,11 +1,15 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import SearchBar from "@/components/SearchBar";
+import { useQuery } from "@tanstack/react-query";
+import SearchAutocomplete from "@/components/SearchAutocomplete";
 import StreamingServiceCard from "@/components/StreamingServiceCard";
 import ContentCard from "@/components/ContentCard";
 import SavingsAnalyzer from "@/components/SavingsAnalyzer";
+import MediaRow from "@/components/MediaRow";
+import RecentlyViewedRow from "@/components/RecentlyViewedRow";
 import { ArrowRight, Sparkles, Zap, Shield, PiggyBank } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { fetchMediaList, TMDBMovie, TMDBTvShow } from "@/lib/tmdb";
 
 const streamingServices = [
   { id: "netflix", name: "Netflix", logo: "N", color: "#E50914" },
@@ -80,7 +84,6 @@ const platformUsageData = [
 const Index = () => {
   const navigate = useNavigate();
   const [connectedServices, setConnectedServices] = useState<string[]>(["netflix", "disney", "hulu", "hbo", "prime", "apple"]);
-  const [searchQuery, setSearchQuery] = useState("");
 
   const toggleService = (serviceId: string) => {
     setConnectedServices((prev) =>
@@ -91,9 +94,22 @@ const Index = () => {
   };
 
   const handleSearch = (query: string) => {
-    setSearchQuery(query);
     navigate("/search");
   };
+
+  // Fetch trending movies
+  const { data: trendingMovies, isLoading: loadingTrendingMovies } = useQuery({
+    queryKey: ['trending-movies-home'],
+    queryFn: () => fetchMediaList<TMDBMovie>('/trending/movie/week', 1),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Fetch trending TV
+  const { data: trendingTv, isLoading: loadingTrendingTv } = useQuery({
+    queryKey: ['trending-tv-home'],
+    queryFn: () => fetchMediaList<TMDBTvShow>('/trending/tv/week', 1),
+    staleTime: 5 * 60 * 1000,
+  });
 
   return (
     <div className="min-h-screen pt-20">
@@ -121,7 +137,12 @@ const Index = () => {
               Search across all your streaming platforms instantly. No more switching between apps to find your next favorite show.
             </p>
 
-            <SearchBar onSearch={handleSearch} />
+            <div className="max-w-3xl mx-auto">
+              <SearchAutocomplete 
+                placeholder="Search movies and TV shows..."
+                onSearch={handleSearch}
+              />
+            </div>
 
             <div className="flex flex-wrap justify-center gap-3 mt-8">
               <span className="text-sm text-muted-foreground">Popular:</span>
@@ -176,16 +197,49 @@ const Index = () => {
         </div>
       </section>
 
+      {/* Recently Viewed */}
+      <section className="py-8 px-6">
+        <div className="max-w-7xl mx-auto">
+          <RecentlyViewedRow />
+        </div>
+      </section>
+
+      {/* Trending Movies */}
+      <section className="py-8 px-6">
+        <div className="max-w-7xl mx-auto">
+          <MediaRow 
+            title="Trending Movies" 
+            items={(trendingMovies?.results || []).slice(0, 10)} 
+            mediaType="movie"
+            loading={loadingTrendingMovies}
+            viewAllLink="/movies"
+          />
+        </div>
+      </section>
+
+      {/* Trending TV */}
+      <section className="py-8 px-6">
+        <div className="max-w-7xl mx-auto">
+          <MediaRow 
+            title="Trending TV Shows" 
+            items={(trendingTv?.results || []).slice(0, 10)} 
+            mediaType="tv"
+            loading={loadingTrendingTv}
+            viewAllLink="/series"
+          />
+        </div>
+      </section>
+
       {/* Featured Content */}
       <section className="py-16 px-6">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-8">
             <div>
               <h2 className="font-display text-3xl font-bold text-foreground mb-2">
-                Trending Now
+                Available Now
               </h2>
               <p className="text-muted-foreground">
-                Available on your connected services
+                Popular on your connected services
               </p>
             </div>
             <Button variant="ghost" className="text-primary" asChild>
@@ -307,7 +361,7 @@ const Index = () => {
       <footer className="py-12 px-6 border-t border-border">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-orange-400 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center">
               <span className="text-primary-foreground font-bold text-sm">EZ</span>
             </div>
             <span className="font-display font-semibold text-foreground">EZstream</span>

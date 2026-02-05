@@ -5,13 +5,15 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import ProviderButton from "@/components/ProviderButton";
 import AffiliateDisclosure from "@/components/AffiliateDisclosure";
+import WatchlistButton from "@/components/WatchlistButton";
+import { useRecentlyViewed } from "@/hooks/useRecentlyViewed";
+import { getSortedProviders } from "@/lib/provider-utils";
 import { 
   getTvDetails, 
   getTvWatchProviders, 
   getImageUrl, 
   TMDBTvShow, 
-  WatchProviderData,
-  WatchProvider 
+  WatchProviderData
 } from "@/lib/tmdb";
 
 const REGIONS = [
@@ -36,6 +38,7 @@ const TvDetails = () => {
   const [region, setRegion] = useState("US");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { addItem } = useRecentlyViewed();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -63,6 +66,18 @@ const TvDetails = () => {
     fetchData();
   }, [id]);
 
+  // Track recently viewed
+  useEffect(() => {
+    if (show) {
+      addItem({
+        id: show.id,
+        mediaType: 'tv',
+        title: show.name,
+        posterPath: show.poster_path,
+      });
+    }
+  }, [show, addItem]);
+
   const backdropUrl = show ? getImageUrl(show.backdrop_path, "original") : null;
   const posterUrl = show ? getImageUrl(show.poster_path, "w500") : null;
   const year = show?.first_air_date ? new Date(show.first_air_date).getFullYear().toString() : undefined;
@@ -74,32 +89,12 @@ const TvDetails = () => {
     regionProviders.buy?.length
   );
 
-  const renderProviderSection = (
-    providerList: WatchProvider[] | undefined, 
-    category: "Streaming" | "Rent" | "Buy"
-  ) => {
-    if (!providerList?.length) return null;
-    
-    return (
-      <div className="space-y-3">
-        <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-          {category}
-        </h4>
-        <div className="grid gap-2">
-          {providerList.map((provider) => (
-            <ProviderButton
-              key={provider.provider_id}
-              provider={provider}
-              category={category}
-              movieTitle={show?.name || ""}
-              movieYear={year}
-              tmdbLink={regionProviders?.link}
-            />
-          ))}
-        </div>
-      </div>
-    );
-  };
+  // Get sorted providers
+  const sortedProviders = regionProviders ? getSortedProviders(
+    regionProviders.flatrate,
+    regionProviders.rent,
+    regionProviders.buy
+  ) : [];
 
   if (loading) {
     return (
@@ -190,6 +185,14 @@ const TvDetails = () => {
                 {show.tagline && (
                   <p className="text-muted-foreground text-lg italic">"{show.tagline}"</p>
                 )}
+                <div className="mt-4">
+                  <WatchlistButton
+                    mediaId={show.id}
+                    mediaType="tv"
+                    title={show.name}
+                    posterPath={show.poster_path}
+                  />
+                </div>
               </div>
 
               <div className="flex flex-wrap items-center gap-4 text-sm">
@@ -293,10 +296,18 @@ const TvDetails = () => {
                   </Button>
                 )}
                 
-                <div className="grid md:grid-cols-3 gap-6">
-                  {renderProviderSection(regionProviders?.flatrate, "Streaming")}
-                  {renderProviderSection(regionProviders?.rent, "Rent")}
-                  {renderProviderSection(regionProviders?.buy, "Buy")}
+                {/* Sorted providers list */}
+                <div className="grid gap-2">
+                  {sortedProviders.map(({ provider, category }) => (
+                    <ProviderButton
+                      key={provider.provider_id}
+                      provider={provider}
+                      category={category}
+                      movieTitle={show.name}
+                      movieYear={year}
+                      tmdbLink={regionProviders?.link}
+                    />
+                  ))}
                 </div>
                 
                 <p className="text-muted-foreground/70 text-sm text-center mt-4">

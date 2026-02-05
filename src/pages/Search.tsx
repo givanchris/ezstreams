@@ -2,8 +2,9 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Search as SearchIcon, ArrowLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import MovieCard from "@/components/MovieCard";
+import SearchAutocomplete from "@/components/SearchAutocomplete";
+import RecentlyViewedRow from "@/components/RecentlyViewedRow";
 import { searchMovies, TMDBMovie } from "@/lib/tmdb";
 
 const Search = () => {
@@ -13,16 +14,16 @@ const Search = () => {
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!query.trim()) return;
-
+  const handleSearch = async (searchQuery: string) => {
+    if (!searchQuery.trim()) return;
+    
+    setQuery(searchQuery);
     setLoading(true);
     setError(null);
     setHasSearched(true);
 
     try {
-      const data = await searchMovies(query.trim());
+      const data = await searchMovies(searchQuery.trim());
       setResults(data.results);
     } catch (err) {
       console.error("Search error:", err);
@@ -56,23 +57,21 @@ const Search = () => {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="animate-fade-up max-w-3xl mx-auto" style={{ animationDelay: "0.1s" }}>
-          <div className="glass-card rounded-2xl p-2 flex gap-2">
-            <div className="relative flex-1">
-              <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-              <Input
-                type="text"
-                placeholder="Search movies…"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                className="w-full pl-12 pr-4 py-6 bg-transparent border-none text-lg placeholder:text-muted-foreground focus-visible:ring-0"
-              />
-            </div>
-            <Button type="submit" variant="hero" size="lg" className="px-8" disabled={loading}>
-              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Search"}
-            </Button>
+        <div className="animate-fade-up max-w-3xl mx-auto" style={{ animationDelay: "0.1s" }}>
+          <div className="glass-card rounded-2xl p-4">
+            <SearchAutocomplete 
+              placeholder="Search movies..."
+              onSearch={handleSearch}
+            />
           </div>
-        </form>
+        </div>
+
+        {/* Recently Viewed - show when no search */}
+        {!hasSearched && !loading && (
+          <div className="mt-12">
+            <RecentlyViewedRow showClear={true} />
+          </div>
+        )}
 
         {/* Loading State */}
         {loading && (
