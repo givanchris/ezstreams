@@ -5,6 +5,49 @@
  * and other providers with appropriate search fallbacks.
  */
 
+// Provider sign-in page URLs
+export const providerSignInUrls: Record<string, string> = {
+  'netflix': 'https://www.netflix.com/login',
+  'hulu': 'https://secure.hulu.com/account/signin',
+  'max': 'https://play.max.com/signIn',
+  'hbo max': 'https://play.max.com/signIn',
+  'hbo': 'https://play.max.com/signIn',
+  'amazon': 'https://www.amazon.com/ap/signin',
+  'amazon prime video': 'https://www.amazon.com/ap/signin',
+  'prime video': 'https://www.amazon.com/ap/signin',
+  'disney plus': 'https://www.disneyplus.com/login',
+  'disney+': 'https://www.disneyplus.com/login',
+  'apple tv': 'https://tv.apple.com/',
+  'apple tv plus': 'https://tv.apple.com/',
+  'apple tv+': 'https://tv.apple.com/',
+  'paramount plus': 'https://www.paramountplus.com/account/signin/',
+  'paramount+': 'https://www.paramountplus.com/account/signin/',
+  'peacock': 'https://www.peacocktv.com/signin',
+  'peacock premium': 'https://www.peacocktv.com/signin',
+};
+
+/**
+ * Get the sign-in URL for a provider
+ * Returns undefined if the provider is not in the mapping
+ */
+export function getProviderSignInUrl(providerName: string): string | undefined {
+  const normalized = providerName.toLowerCase().trim();
+  
+  // Exact match first
+  if (providerSignInUrls[normalized]) {
+    return providerSignInUrls[normalized];
+  }
+  
+  // Partial match
+  for (const key of Object.keys(providerSignInUrls)) {
+    if (normalized.includes(key) || key.includes(normalized)) {
+      return providerSignInUrls[key];
+    }
+  }
+  
+  return undefined;
+}
+
 // Provider search URL builders
 const providerSearchUrls: Record<string, (title: string, year?: string) => string> = {
   // Netflix
