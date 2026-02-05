@@ -3,6 +3,7 @@ import { WatchProvider, getImageUrl } from "@/lib/tmdb";
 import { Button } from "@/components/ui/button";
 import { isAmazonProvider, getAffiliateUrl } from "@/lib/amazon-affiliate";
 import { getProviderOutboundUrl, getProviderSignInUrl } from "@/lib/provider-links";
+import { openWithDeepLink, isMobileDevice } from "@/lib/provider-utils";
 
 interface ProviderButtonProps {
   provider: WatchProvider;
@@ -42,8 +43,14 @@ const ProviderButton = ({ provider, category, movieTitle, movieYear, tmdbLink }:
 
   const handleClick = () => {
     const outboundUrl = getOutboundUrl();
-    // All outbound links open in new tab with security attributes
-    window.open(outboundUrl, '_blank', 'noopener,noreferrer');
+    
+    // On mobile, try deep link first with web fallback
+    if (isMobileDevice()) {
+      openWithDeepLink(provider.provider_name, movieTitle, outboundUrl);
+    } else {
+      // Desktop: open in new tab
+      window.open(outboundUrl, '_blank', 'noopener,noreferrer');
+    }
   };
 
   const handleSignInClick = (e: React.MouseEvent) => {

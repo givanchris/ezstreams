@@ -14,7 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      watchlist: {
+        Row: {
+          added_at: string
+          id: string
+          media_id: string
+          media_type: string
+          poster_path: string | null
+          title: string
+          user_id: string
+        }
+        Insert: {
+          added_at?: string
+          id?: string
+          media_id: string
+          media_type: string
+          poster_path?: string | null
+          title: string
+          user_id: string
+        }
+        Update: {
+          added_at?: string
+          id?: string
+          media_id?: string
+          media_type?: string
+          poster_path?: string | null
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
