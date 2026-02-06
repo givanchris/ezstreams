@@ -2,8 +2,10 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Loader2, Film, Tv2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import { getImageUrl } from '@/lib/tmdb';
 import { supabase } from '@/integrations/supabase/client';
+import { rankSearchResults } from '@/lib/search-ranking';
 
 interface SearchResult {
   id: number;
@@ -13,6 +15,9 @@ interface SearchResult {
   release_date?: string;
   first_air_date?: string;
   media_type: 'movie' | 'tv';
+  popularity?: number;
+  vote_count?: number;
+  vote_average?: number;
 }
 
 interface SearchAutocompleteProps {
@@ -71,12 +76,12 @@ const SearchAutocomplete = ({
       if (!response.ok) throw new Error('Search failed');
       
       const data = await response.json();
-      // Filter to only movies and TV shows
+      // Filter to only movies and TV shows, then rank
       const filtered = (data.results || [])
-        .filter((item: SearchResult) => item.media_type === 'movie' || item.media_type === 'tv')
-        .slice(0, 8);
+        .filter((item: SearchResult) => item.media_type === 'movie' || item.media_type === 'tv');
+      const ranked = rankSearchResults<SearchResult>(filtered, searchQuery).slice(0, 8);
       
-      setResults(filtered);
+      setResults(ranked);
     } catch (error) {
       console.error('Search error:', error);
       setResults([]);
@@ -200,10 +205,14 @@ const SearchAutocomplete = ({
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-foreground truncate">{title}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-foreground truncate">{title}</p>
+                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0 shrink-0">
+                      {result.media_type === 'movie' ? 'Movie' : 'TV Series'}
+                    </Badge>
+                  </div>
                   <p className="text-sm text-muted-foreground">
-                    {result.media_type === 'movie' ? 'Movie' : 'TV Show'}
-                    {year && ` · ${year}`}
+                    {year && `${year}`}
                   </p>
                 </div>
               </button>

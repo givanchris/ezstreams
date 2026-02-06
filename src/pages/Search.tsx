@@ -6,6 +6,7 @@ import MovieCard from "@/components/MovieCard";
 import SearchAutocomplete from "@/components/SearchAutocomplete";
 import RecentlyViewedRow from "@/components/RecentlyViewedRow";
 import { searchMovies, TMDBMovie } from "@/lib/tmdb";
+import { rankSearchResults } from "@/lib/search-ranking";
 
 const Search = () => {
   const [query, setQuery] = useState("");
@@ -24,7 +25,7 @@ const Search = () => {
 
     try {
       const data = await searchMovies(searchQuery.trim());
-      setResults(data.results);
+      setResults(rankSearchResults(data.results, searchQuery.trim()));
     } catch (err) {
       console.error("Search error:", err);
       setError(err instanceof Error ? err.message : "Failed to search movies");
