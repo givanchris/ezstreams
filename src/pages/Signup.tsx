@@ -35,10 +35,10 @@ const Signup = () => {
       return;
     }
 
-    if (password.length < 6) {
+    if (password.length < 8 || !/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
       toast({
         title: "Weak password",
-        description: "Password must be at least 6 characters long.",
+        description: "Password must be at least 8 characters and include a special character (!@#$%^&* etc.).",
         variant: "destructive",
       });
       return;
@@ -163,7 +163,7 @@ const Signup = () => {
                 disabled={loading}
               />
               <p className="text-xs text-muted-foreground">
-                Must be at least 6 characters
+                Min 8 characters with 1 special character (!@#$%&* etc.)
               </p>
             </div>
 
