@@ -1,16 +1,30 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Search as SearchIcon, ArrowLeft, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import MovieCard from "@/components/MovieCard";
+import MediaCard from "@/components/MediaCard";
 import SearchAutocomplete from "@/components/SearchAutocomplete";
 import RecentlyViewedRow from "@/components/RecentlyViewedRow";
-import { searchMovies, TMDBMovie } from "@/lib/tmdb";
+import { tmdbFetch, TMDBSearchResponse } from "@/lib/tmdb";
 import { rankSearchResults } from "@/lib/search-ranking";
+
+interface MultiSearchResult {
+  id: number;
+  title?: string;
+  name?: string;
+  overview: string;
+  poster_path: string | null;
+  backdrop_path: string | null;
+  release_date?: string;
+  first_air_date?: string;
+  vote_average: number;
+  vote_count: number;
+  popularity?: number;
+  media_type: 'movie' | 'tv' | 'person';
+}
 
 const Search = () => {
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<TMDBMovie[]>([]);
+  const [results, setResults] = useState<MultiSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
@@ -24,11 +38,19 @@ const Search = () => {
     setHasSearched(true);
 
     try {
-      const data = await searchMovies(searchQuery.trim());
-      setResults(rankSearchResults(data.results, searchQuery.trim()));
+      const data = await tmdbFetch<TMDBSearchResponse<MultiSearchResult>>(
+        '/search/multi',
+        { query: searchQuery.trim(), page: '1', include_adult: 'false' }
+      );
+      // Filter to movies and TV only, then rank
+      const filtered = data.results.filter(
+        (r): r is MultiSearchResult & { media_type: 'movie' | 'tv' } =>
+          r.media_type === 'movie' || r.media_type === 'tv'
+      );
+      setResults(rankSearchResults(filtered, searchQuery.trim()) as MultiSearchResult[]);
     } catch (err) {
       console.error("Search error:", err);
-      setError(err instanceof Error ? err.message : "Failed to search movies");
+      setError(err instanceof Error ? err.message : "Failed to search");
       setResults([]);
     } finally {
       setLoading(false);
@@ -51,17 +73,17 @@ const Search = () => {
 
         <div className="text-center mb-12 animate-fade-up">
           <h1 className="font-display text-4xl md:text-5xl font-bold text-foreground mb-4">
-            Search <span className="text-gradient">Movies</span>
+            Search <span className="text-gradient">Movies & TV</span>
           </h1>
           <p className="text-muted-foreground text-lg">
-            Find movies and see where to watch them
+            Find movies and TV shows, see where to watch them
           </p>
         </div>
 
         <div className="animate-fade-up max-w-3xl mx-auto" style={{ animationDelay: "0.1s" }}>
           <div className="glass-card rounded-2xl p-4">
             <SearchAutocomplete 
-              placeholder="Search movies..."
+              placeholder="Search movies and TV shows..."
               onSearch={handleSearch}
             />
           </div>
@@ -99,7 +121,7 @@ const Search = () => {
             <div className="glass-card rounded-2xl p-12 text-center">
               <SearchIcon className="w-16 h-16 text-muted-foreground/50 mx-auto mb-4" />
               <p className="text-muted-foreground text-lg">
-                No movies found for "{query}"
+                No results found for "{query}"
               </p>
               <p className="text-muted-foreground/70 text-sm mt-2">
                 Try a different search term
@@ -115,8 +137,17 @@ const Search = () => {
               Found {results.length} result{results.length !== 1 ? "s" : ""} for "{query}"
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-              {results.map((movie) => (
-                <MovieCard key={movie.id} movie={movie} />
+              {results.map((item) => (
+                <MediaCard
+                  key={`${item.media_type}-${item.id}`}
+                  id={item.id}
+                  title={item.title || item.name || ''}
+                  posterPath={item.poster_path}
+                  voteAverage={item.vote_average}
+                  releaseDate={item.release_date || item.first_air_date || ''}
+                  overview={item.overview}
+                  mediaType={item.media_type as 'movie' | 'tv'}
+                />
               ))}
             </div>
           </div>
@@ -128,7 +159,7 @@ const Search = () => {
             <div className="glass-card rounded-2xl p-12 text-center">
               <SearchIcon className="w-16 h-16 text-muted-foreground/50 mx-auto mb-4" />
               <p className="text-muted-foreground text-lg">
-                Start typing to search for movies
+                Start typing to search for movies and TV shows
               </p>
             </div>
           </div>
