@@ -94,7 +94,7 @@ const Index = () => {
   };
 
   const handleSearch = (query: string) => {
-    navigate("/search");
+    navigate(`/search?q=${encodeURIComponent(query)}`);
   };
 
   // Fetch trending movies
