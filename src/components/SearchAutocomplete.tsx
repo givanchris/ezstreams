@@ -24,14 +24,16 @@ interface SearchAutocompleteProps {
   placeholder?: string;
   onSearch?: (query: string) => void;
   className?: string;
+  initialQuery?: string;
 }
 
 const SearchAutocomplete = ({
   placeholder = 'Search movies and TV shows...',
   onSearch,
   className = '',
+  initialQuery = '',
 }: SearchAutocompleteProps) => {
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -90,6 +92,11 @@ const SearchAutocomplete = ({
     }
   }, []);
 
+  // Sync with initialQuery prop
+  useEffect(() => {
+    setQuery(initialQuery);
+  }, [initialQuery]);
+
   useEffect(() => {
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
@@ -137,9 +144,9 @@ const SearchAutocomplete = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (query.trim() && onSearch) {
-      onSearch(query.trim());
+    if (query.trim()) {
       setShowDropdown(false);
+      navigate(`/search?q=${encodeURIComponent(query.trim())}`);
     }
   };
 

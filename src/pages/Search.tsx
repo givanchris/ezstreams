@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import { Search as SearchIcon, ArrowLeft, Loader2 } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import { Search as SearchIcon, ArrowLeft, Loader2, X } from "lucide-react";
 import MediaCard from "@/components/MediaCard";
 import SearchAutocomplete from "@/components/SearchAutocomplete";
 import RecentlyViewedRow from "@/components/RecentlyViewedRow";
@@ -23,16 +23,16 @@ interface MultiSearchResult {
 }
 
 const Search = () => {
-  const [query, setQuery] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlQuery = searchParams.get("q") || "";
   const [results, setResults] = useState<MultiSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
 
-  const handleSearch = async (searchQuery: string) => {
+  const runSearch = useCallback(async (searchQuery: string) => {
     if (!searchQuery.trim()) return;
     
-    setQuery(searchQuery);
     setLoading(true);
     setError(null);
     setHasSearched(true);
@@ -42,7 +42,6 @@ const Search = () => {
         '/search/multi',
         { query: searchQuery.trim(), page: '1', include_adult: 'false' }
       );
-      // Filter to movies and TV only, then rank
       const filtered = data.results.filter(
         (r): r is MultiSearchResult & { media_type: 'movie' | 'tv' } =>
           r.media_type === 'movie' || r.media_type === 'tv'
@@ -55,6 +54,26 @@ const Search = () => {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  // Auto-search when URL query param changes
+  useEffect(() => {
+    if (urlQuery) {
+      runSearch(urlQuery);
+    } else {
+      setResults([]);
+      setHasSearched(false);
+    }
+  }, [urlQuery, runSearch]);
+
+  const handleSearch = (searchQuery: string) => {
+    setSearchParams({ q: searchQuery });
+  };
+
+  const handleClear = () => {
+    setSearchParams({});
+    setResults([]);
+    setHasSearched(false);
   };
 
   return (
@@ -82,10 +101,24 @@ const Search = () => {
 
         <div className="animate-fade-up max-w-3xl mx-auto" style={{ animationDelay: "0.1s" }}>
           <div className="glass-card rounded-2xl p-4">
-            <SearchAutocomplete 
-              placeholder="Search movies and TV shows..."
-              onSearch={handleSearch}
-            />
+            <div className="flex items-center gap-2">
+              <div className="flex-1">
+                <SearchAutocomplete 
+                  placeholder="Search movies and TV shows..."
+                  onSearch={handleSearch}
+                  initialQuery={urlQuery}
+                />
+              </div>
+              {urlQuery && (
+                <button
+                  onClick={handleClear}
+                  className="shrink-0 p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
+                  title="Clear search"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -121,7 +154,7 @@ const Search = () => {
             <div className="glass-card rounded-2xl p-12 text-center">
               <SearchIcon className="w-16 h-16 text-muted-foreground/50 mx-auto mb-4" />
               <p className="text-muted-foreground text-lg">
-                No results found for "{query}"
+                No results found for "{urlQuery}"
               </p>
               <p className="text-muted-foreground/70 text-sm mt-2">
                 Try a different search term
@@ -134,7 +167,7 @@ const Search = () => {
         {!loading && results.length > 0 && (
           <div className="mt-12 animate-fade-up">
             <p className="text-muted-foreground mb-6">
-              Found {results.length} result{results.length !== 1 ? "s" : ""} for "{query}"
+              Found {results.length} result{results.length !== 1 ? "s" : ""} for "{urlQuery}"
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {results.map((item) => (
