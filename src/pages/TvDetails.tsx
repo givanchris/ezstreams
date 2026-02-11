@@ -8,6 +8,7 @@ import AffiliateDisclosure from "@/components/AffiliateDisclosure";
 import WatchlistButton from "@/components/WatchlistButton";
 import { useRecentlyViewed } from "@/hooks/useRecentlyViewed";
 import { getSortedProviders } from "@/lib/provider-utils";
+import Footer from "@/components/Footer";
 import { 
   getTvDetails, 
   getTvWatchProviders, 
@@ -328,6 +329,7 @@ const TvDetails = () => {
           </div>
         </div>
       </div>
+      <Footer />
     </div>
   );
 };

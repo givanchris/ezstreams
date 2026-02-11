@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import MediaCard from "@/components/MediaCard";
 import { useWatchlist } from "@/hooks/useWatchlist";
 import { useAuth } from "@/contexts/AuthContext";
+import Footer from "@/components/Footer";
 
 const Lists = () => {
   const { user } = useAuth();
@@ -146,6 +147,7 @@ const Lists = () => {
           </div>
         )}
       </div>
+      <Footer />
     </div>
   );
 };

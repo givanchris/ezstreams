@@ -2,6 +2,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { User, LogOut, Home, Mail, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
+import Footer from "@/components/Footer";
 
 const Profile = () => {
   const { user, signOut } = useAuth();
@@ -85,6 +86,7 @@ const Profile = () => {
           </Button>
         </div>
       </div>
+      <Footer />
     </div>
   );
 };

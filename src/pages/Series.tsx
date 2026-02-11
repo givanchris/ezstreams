@@ -1,6 +1,7 @@
 import { Tv2 } from "lucide-react";
 import TabbedMediaGrid, { getDefaultTabs } from "@/components/TabbedMediaGrid";
 import RecentlyViewedRow from "@/components/RecentlyViewedRow";
+import Footer from "@/components/Footer";
 
 const Series = () => {
   const tabs = getDefaultTabs("tv");
@@ -37,6 +38,7 @@ const Series = () => {
           icon="tv"
         />
       </div>
+      <Footer />
     </div>
   );
 };

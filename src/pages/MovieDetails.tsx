@@ -8,6 +8,7 @@ import AffiliateDisclosure from "@/components/AffiliateDisclosure";
 import WatchlistButton from "@/components/WatchlistButton";
 import { useRecentlyViewed } from "@/hooks/useRecentlyViewed";
 import { getSortedProviders } from "@/lib/provider-utils";
+import Footer from "@/components/Footer";
 import { 
   getMovieDetails, 
   getWatchProviders, 
@@ -308,6 +309,7 @@ const MovieDetails = () => {
           </div>
         </div>
       </div>
+      <Footer />
     </div>
   );
 };
