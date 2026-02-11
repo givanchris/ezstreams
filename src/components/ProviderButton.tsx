@@ -42,6 +42,12 @@ const ProviderButton = ({ provider, category, movieTitle, movieYear, tmdbLink }:
   };
 
   const handleClick = () => {
+    // If sign-in URL exists, use it as the primary destination
+    if (signInUrl) {
+      window.open(signInUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    
     const outboundUrl = getOutboundUrl();
     
     // On mobile, try deep link first with web fallback
@@ -53,20 +59,13 @@ const ProviderButton = ({ provider, category, movieTitle, movieYear, tmdbLink }:
     }
   };
 
-  const handleSignInClick = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent triggering the parent button click
-    if (signInUrl) {
-      window.open(signInUrl, '_blank', 'noopener,noreferrer');
-    }
-  };
-
   // Show "Free with subscription" for streaming category
   const displayLabel = category === "Streaming" ? categoryLabels.Streaming : category;
 
   return (
     <Button
       variant="glass"
-      className="h-auto p-3 flex items-center gap-3 justify-start group"
+      className="h-auto p-3 flex items-center gap-3 justify-start group cursor-pointer"
       onClick={handleClick}
     >
       {logoUrl && (
@@ -79,16 +78,6 @@ const ProviderButton = ({ provider, category, movieTitle, movieYear, tmdbLink }:
       <div className="flex-1 text-left">
         <div className="flex items-center gap-2">
           <p className="font-medium text-foreground text-sm">{provider.provider_name}</p>
-          {signInUrl && (
-            <button
-              onClick={handleSignInClick}
-              className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"
-              title={`Sign in to ${provider.provider_name}`}
-            >
-              <LogIn className="w-3 h-3" />
-              Sign in
-            </button>
-          )}
         </div>
         <span className={`text-xs px-2 py-0.5 rounded-full border ${categoryColors[category]}`}>
           {displayLabel}
