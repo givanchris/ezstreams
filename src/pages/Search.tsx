@@ -5,6 +5,7 @@ import MediaCard from "@/components/MediaCard";
 import SearchAutocomplete from "@/components/SearchAutocomplete";
 import RecentlyViewedRow from "@/components/RecentlyViewedRow";
 import { tmdbFetch, TMDBSearchResponse } from "@/lib/tmdb";
+import Footer from "@/components/Footer";
 import { rankSearchResults } from "@/lib/search-ranking";
 
 interface MultiSearchResult {
@@ -198,6 +199,7 @@ const Search = () => {
           </div>
         )}
       </div>
+      <Footer />
     </div>
   );
 };

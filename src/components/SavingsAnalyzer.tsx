@@ -93,7 +93,7 @@ const SavingsAnalyzer = ({ platforms }: SavingsAnalyzerProps) => {
             return (
               <div
                 key={platform.id}
-                className={`relative p-5 rounded-2xl border transition-all duration-300 hover:scale-[1.01] ${styles.bg} ${styles.border}`}
+                className={`relative p-5 rounded-2xl border transition-all duration-300 ${styles.bg} ${styles.border}`}
               >
                 <div className="flex items-center gap-4">
                   {/* Platform Logo */}
@@ -185,10 +185,10 @@ const SavingsAnalyzer = ({ platforms }: SavingsAnalyzerProps) => {
                 </p>
               </div>
             </div>
-            <Button variant="hero">
-              <TrendingUp className="w-4 h-4 mr-2" />
-              Optimize Subscriptions
-            </Button>
+            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-accent/20 text-accent text-sm font-medium">
+              <TrendingUp className="w-4 h-4" />
+              Feature Coming Soon
+            </span>
           </div>
         </div>
       )}

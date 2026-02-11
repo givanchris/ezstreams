@@ -6,6 +6,7 @@ import StreamingServiceCard from "@/components/StreamingServiceCard";
 import ContentCard from "@/components/ContentCard";
 import SavingsAnalyzer from "@/components/SavingsAnalyzer";
 import MediaRow from "@/components/MediaRow";
+import Footer from "@/components/Footer";
 import RecentlyViewedRow from "@/components/RecentlyViewedRow";
 import { ArrowRight, Sparkles, Zap, Shield, PiggyBank } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -357,31 +358,7 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="py-12 px-6 border-t border-border">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-sm">EZ</span>
-            </div>
-            <span className="font-display font-semibold text-foreground">EZstream</span>
-          </div>
-          
-          <nav className="flex flex-wrap justify-center gap-6 text-sm text-muted-foreground">
-            <a href="#" className="hover:text-foreground transition-colors">About</a>
-            <a href="#" className="hover:text-foreground transition-colors">Privacy</a>
-            <a href="#" className="hover:text-foreground transition-colors">Terms</a>
-            <a href="#" className="hover:text-foreground transition-colors">Contact</a>
-          </nav>
-          
-          <p className="text-sm text-muted-foreground">
-            © 2024 EZstream. All rights reserved.
-          </p>
-        </div>
-        <p className="text-center text-xs text-muted-foreground/70 mt-6">
-          As an Amazon Associate, we may earn from qualifying purchases.
-        </p>
-      </footer>
+      <Footer />
     </div>
   );
 };

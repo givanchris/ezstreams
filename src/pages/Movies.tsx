@@ -1,6 +1,7 @@
 import { Film } from "lucide-react";
 import TabbedMediaGrid, { getDefaultTabs } from "@/components/TabbedMediaGrid";
 import RecentlyViewedRow from "@/components/RecentlyViewedRow";
+import Footer from "@/components/Footer";
 
 const Movies = () => {
   const tabs = getDefaultTabs("movie");
@@ -37,6 +38,7 @@ const Movies = () => {
           icon="movie"
         />
       </div>
+      <Footer />
     </div>
   );
 };
