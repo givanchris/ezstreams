@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { submitSearch } from "@/lib/navigation";
 import { useQuery } from "@tanstack/react-query";
 import SearchAutocomplete from "@/components/SearchAutocomplete";
 import StreamingServiceCard from "@/components/StreamingServiceCard";
@@ -95,7 +96,7 @@ const Index = () => {
   };
 
   const handleSearch = (query: string) => {
-    navigate(`/search?q=${encodeURIComponent(query)}`);
+    submitSearch(query, navigate);
   };
 
   // Fetch trending movies

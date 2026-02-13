@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Loader2, Film, Tv2 } from 'lucide-react';
+import { submitSearch } from '@/lib/navigation';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { getImageUrl } from '@/lib/tmdb';
@@ -146,7 +147,13 @@ const SearchAutocomplete = ({
     e.preventDefault();
     if (query.trim()) {
       setShowDropdown(false);
-      navigate(`/search?q=${encodeURIComponent(query.trim())}`);
+      // Use onSearch if provided (e.g. on /search page to update URL params),
+      // otherwise use shared submitSearch for navigation
+      if (onSearch) {
+        onSearch(query.trim());
+      } else {
+        submitSearch(query, navigate);
+      }
     }
   };
 
