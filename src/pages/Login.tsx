@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -18,9 +19,23 @@ const Login = () => {
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      navigate("/search");
+      navigate("/");
     }
   }, [user, navigate]);
+
+  const [emailNotConfirmed, setEmailNotConfirmed] = useState(false);
+
+  const handleResendVerification = async () => {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+    });
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Verification email sent", description: "Check your inbox for the confirmation link." });
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,6 +49,7 @@ const Login = () => {
       return;
     }
 
+    setEmailNotConfirmed(false);
     setLoading(true);
     const { error } = await signIn(email, password);
     setLoading(false);
@@ -45,6 +61,7 @@ const Login = () => {
         message = "Invalid email or password. Please try again.";
       } else if (error.message.includes("Email not confirmed")) {
         message = "Please confirm your email before logging in.";
+        setEmailNotConfirmed(true);
       } else {
         message = error.message;
       }
@@ -57,7 +74,8 @@ const Login = () => {
       return;
     }
 
-    navigate("/search");
+    toast({ title: "Logged in", description: "Welcome back!" });
+    navigate("/");
   };
 
   return (
@@ -128,6 +146,17 @@ const Login = () => {
                 "Log In"
               )}
             </Button>
+
+            {emailNotConfirmed && (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={handleResendVerification}
+              >
+                Resend verification email
+              </Button>
+            )}
           </form>
 
           <p className="text-center text-sm text-muted-foreground mt-6">
