@@ -73,16 +73,6 @@ const featuredContent = [
   },
 ];
 
-// Mock usage data for the savings analyzer
-const platformUsageData = [
-  { id: "netflix", name: "Netflix", logo: "N", color: "#E50914", monthlyPrice: 15.49, usagePercent: 45, showsWatched: 12, recommendation: "keep" as const },
-  { id: "hulu", name: "Hulu", logo: "H", color: "#1CE783", monthlyPrice: 17.99, usagePercent: 72, showsWatched: 18, recommendation: "keep" as const },
-  { id: "disney", name: "Disney+", logo: "D+", color: "#113CCF", monthlyPrice: 13.99, usagePercent: 28, showsWatched: 5, recommendation: "consider" as const },
-  { id: "hbo", name: "HBO Max", logo: "HBO", color: "#5822B4", monthlyPrice: 15.99, usagePercent: 8, showsWatched: 2, recommendation: "cancel" as const },
-  { id: "prime", name: "Prime Video", logo: "P", color: "#00A8E1", monthlyPrice: 8.99, usagePercent: 5, showsWatched: 1, recommendation: "cancel" as const },
-  { id: "apple", name: "Apple TV+", logo: "🍎", color: "#555555", monthlyPrice: 9.99, usagePercent: 3, showsWatched: 0, recommendation: "cancel" as const },
-];
-
 const Index = () => {
   const navigate = useNavigate();
   const [connectedServices, setConnectedServices] = useState<string[]>(["netflix", "disney", "hulu", "hbo", "prime", "apple"]);
@@ -279,7 +269,7 @@ const Index = () => {
             </p>
           </div>
 
-          <SavingsAnalyzer platforms={platformUsageData.filter(p => connectedServices.includes(p.id))} />
+          <SavingsAnalyzer />
         </div>
       </section>
 

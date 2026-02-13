@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, Star, Clock, Calendar, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import ProviderButton from "@/components/ProviderButton";
 import AffiliateDisclosure from "@/components/AffiliateDisclosure";
 import WatchlistButton from "@/components/WatchlistButton";
 import { useRecentlyViewed } from "@/hooks/useRecentlyViewed";
+import { useProviderTracking } from "@/hooks/useProviderTracking";
 import { getSortedProviders } from "@/lib/provider-utils";
 import Footer from "@/components/Footer";
 import { 
@@ -40,6 +41,8 @@ const MovieDetails = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { addItem } = useRecentlyViewed();
+  const { trackTitle } = useProviderTracking(region);
+  const trackedRef = useRef<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -67,7 +70,7 @@ const MovieDetails = () => {
     fetchData();
   }, [id]);
 
-  // Track recently viewed
+  // Track recently viewed + provider tracking
   useEffect(() => {
     if (movie) {
       addItem({
@@ -76,8 +79,19 @@ const MovieDetails = () => {
         title: movie.title,
         posterPath: movie.poster_path,
       });
+      // Track for provider coverage (dedupe by id+region)
+      const trackKey = `${movie.id}:${region}`;
+      if (trackedRef.current !== trackKey) {
+        trackedRef.current = trackKey;
+        trackTitle({
+          mediaType: 'movie',
+          tmdbId: movie.id,
+          title: movie.title,
+          posterPath: movie.poster_path,
+        });
+      }
     }
-  }, [movie, addItem]);
+  }, [movie, addItem, trackTitle, region]);
 
   const backdropUrl = movie ? getImageUrl(movie.backdrop_path, "original") : null;
   const posterUrl = movie ? getImageUrl(movie.poster_path, "w500") : null;
