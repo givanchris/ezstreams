@@ -14,6 +14,66 @@ export type Database = {
   }
   public: {
     Tables: {
+      user_provider_stats: {
+        Row: {
+          provider_counts: Json
+          region: string
+          total_titles: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          provider_counts?: Json
+          region?: string
+          total_titles?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          provider_counts?: Json
+          region?: string
+          total_titles?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_title_history: {
+        Row: {
+          flatrate_providers: Json | null
+          id: string
+          media_type: string
+          poster_path: string | null
+          region: string
+          selected_at: string
+          title: string
+          tmdb_id: number
+          user_id: string
+        }
+        Insert: {
+          flatrate_providers?: Json | null
+          id?: string
+          media_type: string
+          poster_path?: string | null
+          region?: string
+          selected_at?: string
+          title: string
+          tmdb_id: number
+          user_id: string
+        }
+        Update: {
+          flatrate_providers?: Json | null
+          id?: string
+          media_type?: string
+          poster_path?: string | null
+          region?: string
+          selected_at?: string
+          title?: string
+          tmdb_id?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       watchlist: {
         Row: {
           added_at: string

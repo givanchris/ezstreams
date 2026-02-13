@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, Star, Calendar, ExternalLink, Tv2, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import ProviderButton from "@/components/ProviderButton";
 import AffiliateDisclosure from "@/components/AffiliateDisclosure";
 import WatchlistButton from "@/components/WatchlistButton";
 import { useRecentlyViewed } from "@/hooks/useRecentlyViewed";
+import { useProviderTracking } from "@/hooks/useProviderTracking";
 import { getSortedProviders } from "@/lib/provider-utils";
 import Footer from "@/components/Footer";
 import { 
@@ -40,6 +41,8 @@ const TvDetails = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { addItem } = useRecentlyViewed();
+  const { trackTitle } = useProviderTracking(region);
+  const trackedRef = useRef<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -67,7 +70,7 @@ const TvDetails = () => {
     fetchData();
   }, [id]);
 
-  // Track recently viewed
+  // Track recently viewed + provider tracking
   useEffect(() => {
     if (show) {
       addItem({
@@ -76,8 +79,18 @@ const TvDetails = () => {
         title: show.name,
         posterPath: show.poster_path,
       });
+      const trackKey = `${show.id}:${region}`;
+      if (trackedRef.current !== trackKey) {
+        trackedRef.current = trackKey;
+        trackTitle({
+          mediaType: 'tv',
+          tmdbId: show.id,
+          title: show.name,
+          posterPath: show.poster_path,
+        });
+      }
     }
-  }, [show, addItem]);
+  }, [show, addItem, trackTitle, region]);
 
   const backdropUrl = show ? getImageUrl(show.backdrop_path, "original") : null;
   const posterUrl = show ? getImageUrl(show.poster_path, "w500") : null;
