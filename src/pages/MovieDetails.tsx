@@ -42,7 +42,7 @@ const MovieDetails = () => {
   const [error, setError] = useState<string | null>(null);
   const { addItem } = useRecentlyViewed();
   const { trackTitle } = useProviderTracking(region);
-  const trackedRef = useRef<string | null>(null);
+  const trackedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const fetchData = async () => {
@@ -70,7 +70,7 @@ const MovieDetails = () => {
     fetchData();
   }, [id]);
 
-  // Track recently viewed + provider tracking
+  // Track recently viewed
   useEffect(() => {
     if (movie) {
       addItem({
@@ -79,10 +79,15 @@ const MovieDetails = () => {
         title: movie.title,
         posterPath: movie.poster_path,
       });
-      // Track for provider coverage (dedupe by id+region)
+    }
+  }, [movie, addItem]);
+
+  // Track for provider coverage (dedupe by id+region per session)
+  useEffect(() => {
+    if (movie) {
       const trackKey = `${movie.id}:${region}`;
-      if (trackedRef.current !== trackKey) {
-        trackedRef.current = trackKey;
+      if (!trackedRef.current.has(trackKey)) {
+        trackedRef.current.add(trackKey);
         trackTitle({
           mediaType: 'movie',
           tmdbId: movie.id,
@@ -91,7 +96,7 @@ const MovieDetails = () => {
         });
       }
     }
-  }, [movie, addItem, trackTitle, region]);
+  }, [movie, trackTitle, region]);
 
   const backdropUrl = movie ? getImageUrl(movie.backdrop_path, "original") : null;
   const posterUrl = movie ? getImageUrl(movie.poster_path, "w500") : null;

@@ -187,8 +187,8 @@ const Search = () => {
           </div>
         )}
 
-        {/* Initial State */}
-        {!hasSearched && !loading && (
+        {/* Initial State - only show when no search */}
+        {!hasSearched && !loading && results.length === 0 && (
           <div className="mt-12 animate-fade-up">
             <div className="glass-card rounded-2xl p-12 text-center">
               <SearchIcon className="w-16 h-16 text-muted-foreground/50 mx-auto mb-4" />

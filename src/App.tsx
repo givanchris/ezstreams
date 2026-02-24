@@ -13,6 +13,7 @@ import Search from "./pages/Search";
 import Movies from "./pages/Movies";
 import Series from "./pages/Series";
 import Lists from "./pages/Lists";
+import Subscriptions from "./pages/Subscriptions";
 import Profile from "./pages/Profile";
 import MovieDetails from "./pages/MovieDetails";
 import SeriesDetails from "./pages/SeriesDetails";
@@ -65,6 +66,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Lists />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/subscriptions"
+              element={
+                <ProtectedRoute>
+                  <Subscriptions />
                 </ProtectedRoute>
               }
             />
