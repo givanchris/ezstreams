@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      reviews: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          id: string
+          media_type: string
+          rating: number
+          review_text: string | null
+          tmdb_id: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          media_type: string
+          rating: number
+          review_text?: string | null
+          tmdb_id: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          media_type?: string
+          rating?: number
+          review_text?: string | null
+          tmdb_id?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_provider_stats: {
         Row: {
           provider_counts: Json
