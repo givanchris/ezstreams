@@ -1,12 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { Search as SearchIcon, ArrowLeft, Loader2, X } from "lucide-react";
 import MediaCard from "@/components/MediaCard";
-import SearchAutocomplete from "@/components/SearchAutocomplete";
-import RecentlyViewedRow from "@/components/RecentlyViewedRow";
 import { tmdbFetch, TMDBSearchResponse } from "@/lib/tmdb";
-import Footer from "@/components/Footer";
 import { rankSearchResults } from "@/lib/search-ranking";
+import { Input } from "@/components/ui/input";
+import { supabase } from "@/integrations/supabase/client";
 
 interface MultiSearchResult {
   id: number;
@@ -25,7 +24,9 @@ interface MultiSearchResult {
 
 const Search = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const urlQuery = searchParams.get("q") || "";
+  const [query, setQuery] = useState(urlQuery);
   const [results, setResults] = useState<MultiSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +34,6 @@ const Search = () => {
 
   const runSearch = useCallback(async (searchQuery: string) => {
     if (!searchQuery.trim()) return;
-    
     setLoading(true);
     setError(null);
     setHasSearched(true);
@@ -57,7 +57,10 @@ const Search = () => {
     }
   }, []);
 
-  // Auto-search when URL query param changes
+  // Sync local query with URL
+  useEffect(() => { setQuery(urlQuery); }, [urlQuery]);
+
+  // Auto-search when URL query changes
   useEffect(() => {
     if (urlQuery) {
       runSearch(urlQuery);
@@ -67,139 +70,118 @@ const Search = () => {
     }
   }, [urlQuery, runSearch]);
 
-  const handleSearch = (searchQuery: string) => {
-    setSearchParams({ q: searchQuery });
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (query.trim()) {
+      setSearchParams({ q: query.trim() });
+    }
   };
 
   const handleClear = () => {
+    setQuery("");
     setSearchParams({});
     setResults([]);
     setHasSearched(false);
   };
 
+  // ESC to go back
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") navigate(-1);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [navigate]);
+
   return (
-    <div className="min-h-screen px-6 py-12">
-      <div className="hero-glow top-0 left-1/4 animate-pulse-glow" />
-      <div className="hero-glow bottom-0 right-1/4 animate-pulse-glow" style={{ animationDelay: "1.5s" }} />
-
-      <div className="max-w-6xl mx-auto relative z-10">
-        <Link
-          to="/"
-          className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-12"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to home
-        </Link>
-
-        <div className="text-center mb-12 animate-fade-up">
-          <h1 className="font-display text-4xl md:text-5xl font-bold text-foreground mb-4">
-            Search <span className="text-gradient">Movies & TV</span>
-          </h1>
-          <p className="text-muted-foreground text-lg">
-            Find movies and TV shows, see where to watch them
-          </p>
+    <div className="min-h-screen flex flex-col bg-background">
+      {/* Pinned search bar */}
+      <div className="sticky top-0 z-40 bg-background/90 backdrop-blur-xl border-b border-border/50 px-4 py-3">
+        <div className="max-w-5xl mx-auto flex items-center gap-3">
+          <button
+            onClick={() => navigate(-1)}
+            className="shrink-0 p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
+            title="Go back (ESC)"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <form onSubmit={handleSubmit} className="flex-1 relative">
+            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+            <Input
+              type="text"
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search movies and TV shows..."
+              className="pl-11 pr-10 py-5 bg-secondary/50 border-border text-base"
+            />
+            {loading && (
+              <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 animate-spin text-muted-foreground" />
+            )}
+          </form>
+          {urlQuery && (
+            <button
+              onClick={handleClear}
+              className="shrink-0 p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
         </div>
+      </div>
 
-        <div className="animate-fade-up max-w-3xl mx-auto" style={{ animationDelay: "0.1s" }}>
-          <div className="glass-card rounded-2xl p-4">
-            <div className="flex items-center gap-2">
-              <div className="flex-1">
-                <SearchAutocomplete 
-                  placeholder="Search movies and TV shows..."
-                  onSearch={handleSearch}
-                  initialQuery={urlQuery}
-                />
-              </div>
-              {urlQuery && (
-                <button
-                  onClick={handleClear}
-                  className="shrink-0 p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
-                  title="Clear search"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Recently Viewed - show when no search */}
-        {!hasSearched && !loading && (
-          <div className="mt-12">
-            <RecentlyViewedRow showClear={true} />
-          </div>
-        )}
-
-        {/* Loading State */}
-        {loading && (
-          <div className="mt-12 flex justify-center">
-            <Loader2 className="w-12 h-12 text-primary animate-spin" />
-          </div>
-        )}
-
-        {/* Error State */}
-        {error && !loading && (
-          <div className="mt-12 animate-fade-up">
+      {/* Results area */}
+      <div className="flex-1 px-4 py-6">
+        <div className="max-w-5xl mx-auto">
+          {/* Error */}
+          {error && !loading && (
             <div className="glass-card rounded-2xl p-8 text-center">
               <p className="text-destructive text-lg">{error}</p>
-              <p className="text-muted-foreground text-sm mt-2">
-                Please try again or check your connection.
-              </p>
+              <p className="text-muted-foreground text-sm mt-2">Please try again.</p>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Empty State */}
-        {hasSearched && !loading && !error && results.length === 0 && (
-          <div className="mt-12 animate-fade-up">
-            <div className="glass-card rounded-2xl p-12 text-center">
-              <SearchIcon className="w-16 h-16 text-muted-foreground/50 mx-auto mb-4" />
-              <p className="text-muted-foreground text-lg">
-                No results found for "{urlQuery}"
-              </p>
-              <p className="text-muted-foreground/70 text-sm mt-2">
-                Try a different search term
-              </p>
+          {/* Empty after search */}
+          {hasSearched && !loading && !error && results.length === 0 && (
+            <div className="text-center py-20">
+              <SearchIcon className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+              <p className="text-muted-foreground text-lg">No results for "{urlQuery}"</p>
+              <p className="text-muted-foreground/70 text-sm mt-1">Try a different search term</p>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Results Grid */}
-        {!loading && results.length > 0 && (
-          <div className="mt-12 animate-fade-up">
-            <p className="text-muted-foreground mb-6">
-              Found {results.length} result{results.length !== 1 ? "s" : ""} for "{urlQuery}"
-            </p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-              {results.map((item) => (
-                <MediaCard
-                  key={`${item.media_type}-${item.id}`}
-                  id={item.id}
-                  title={item.title || item.name || ''}
-                  posterPath={item.poster_path}
-                  voteAverage={item.vote_average}
-                  releaseDate={item.release_date || item.first_air_date || ''}
-                  overview={item.overview}
-                  mediaType={item.media_type as 'movie' | 'tv'}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Initial State - only show when no search */}
-        {!hasSearched && !loading && results.length === 0 && (
-          <div className="mt-12 animate-fade-up">
-            <div className="glass-card rounded-2xl p-12 text-center">
-              <SearchIcon className="w-16 h-16 text-muted-foreground/50 mx-auto mb-4" />
-              <p className="text-muted-foreground text-lg">
-                Start typing to search for movies and TV shows
+          {/* Results grid */}
+          {!loading && results.length > 0 && (
+            <>
+              <p className="text-muted-foreground mb-4 text-sm">
+                {results.length} result{results.length !== 1 ? "s" : ""} for "{urlQuery}"
               </p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                {results.map((item) => (
+                  <MediaCard
+                    key={`${item.media_type}-${item.id}`}
+                    id={item.id}
+                    title={item.title || item.name || ''}
+                    posterPath={item.poster_path}
+                    voteAverage={item.vote_average}
+                    releaseDate={item.release_date || item.first_air_date || ''}
+                    overview={item.overview}
+                    mediaType={item.media_type as 'movie' | 'tv'}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* Initial state */}
+          {!hasSearched && !loading && results.length === 0 && !error && (
+            <div className="text-center py-20">
+              <SearchIcon className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+              <p className="text-muted-foreground text-lg">Start typing to search</p>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
-      <Footer />
     </div>
   );
 };

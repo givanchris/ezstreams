@@ -10,6 +10,7 @@ import { useRecentlyViewed } from "@/hooks/useRecentlyViewed";
 import { useProviderTracking } from "@/hooks/useProviderTracking";
 import { getSortedProviders } from "@/lib/provider-utils";
 import Footer from "@/components/Footer";
+import ReviewSection from "@/components/ReviewSection";
 import { 
   getTvDetails, 
   getTvWatchProviders, 
@@ -345,6 +346,11 @@ const TvDetails = () => {
                 </p>
               </div>
             )}
+          </div>
+
+          {/* Reviews */}
+          <div className="mt-8">
+            <ReviewSection tmdbId={parseInt(id!)} mediaType="tv" />
           </div>
         </div>
       </div>
