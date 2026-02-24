@@ -52,13 +52,23 @@ const MovieDetails = () => {
       setError(null);
       
       try {
-        const [movieData, providersData] = await Promise.all([
+        const [movieResult, providersResult] = await Promise.allSettled([
           getMovieDetails(parseInt(id)),
           getWatchProviders(parseInt(id))
         ]);
         
-        setMovie(movieData);
-        setProviders(providersData.results || {});
+        if (movieResult.status === 'rejected') {
+          console.error("Error fetching movie details:", movieResult.reason);
+          setError(movieResult.reason instanceof Error ? movieResult.reason.message : "Movie not found");
+          return;
+        }
+        
+        setMovie(movieResult.value);
+        setProviders(
+          providersResult.status === 'fulfilled' 
+            ? (providersResult.value.results || {}) 
+            : {}
+        );
       } catch (err) {
         console.error("Error fetching movie details:", err);
         setError(err instanceof Error ? err.message : "Failed to load movie details");
