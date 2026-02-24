@@ -104,7 +104,7 @@ const Index = () => {
   });
 
   return (
-    <div className="min-h-screen pt-20">
+    <div className="min-h-screen">
 
       {/* Hero Section */}
       <section className="relative pt-32 pb-20 px-6 overflow-hidden">
@@ -165,7 +165,7 @@ const Index = () => {
               </p>
             </div>
             <Button variant="ghost" className="text-primary" asChild>
-              <Link to="/profile">Manage all <ArrowRight className="w-4 h-4 ml-1" /></Link>
+              <Link to="/subscriptions">Manage all <ArrowRight className="w-4 h-4 ml-1" /></Link>
             </Button>
           </div>
 

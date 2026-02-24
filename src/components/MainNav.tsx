@@ -1,6 +1,6 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Tv, Home, Search, Film, Tv2, Heart, User, Menu, X } from "lucide-react";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Button } from "./ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
@@ -18,6 +18,14 @@ const MainNav = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { user, signOut } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const handleHomeClick = useCallback((e: React.MouseEvent) => {
+    if (location.pathname === "/") {
+      e.preventDefault();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [location.pathname]);
 
   const isActive = (path: string) => {
     if (path === "/") {
@@ -27,11 +35,11 @@ const MainNav = () => {
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 px-6 py-4">
+    <header className="sticky top-0 left-0 right-0 z-50 px-6 py-4 bg-background/80 backdrop-blur-xl">
       <div className="max-w-7xl mx-auto">
         <div className="glass-card rounded-2xl px-6 py-3 flex items-center justify-between">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-3">
+          <Link to="/" onClick={handleHomeClick} className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-orange-400 flex items-center justify-center">
               <Tv className="w-5 h-5 text-primary-foreground" />
             </div>
@@ -49,6 +57,7 @@ const MainNav = () => {
                 <Link
                   key={item.to}
                   to={item.to}
+                  onClick={item.to === "/" ? handleHomeClick : undefined}
                   className={cn(
                     "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200",
                     active
@@ -102,11 +111,14 @@ const MainNav = () => {
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const active = isActive(item.to);
-                return (
+                  return (
                   <Link
                     key={item.to}
                     to={item.to}
-                    onClick={() => setMobileMenuOpen(false)}
+                    onClick={(e) => {
+                      if (item.to === "/") handleHomeClick(e);
+                      setMobileMenuOpen(false);
+                    }}
                     className={cn(
                       "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all",
                       active

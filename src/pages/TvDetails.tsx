@@ -42,7 +42,7 @@ const TvDetails = () => {
   const [error, setError] = useState<string | null>(null);
   const { addItem } = useRecentlyViewed();
   const { trackTitle } = useProviderTracking(region);
-  const trackedRef = useRef<string | null>(null);
+  const trackedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const fetchData = async () => {
@@ -70,7 +70,7 @@ const TvDetails = () => {
     fetchData();
   }, [id]);
 
-  // Track recently viewed + provider tracking
+  // Track recently viewed
   useEffect(() => {
     if (show) {
       addItem({
@@ -79,9 +79,15 @@ const TvDetails = () => {
         title: show.name,
         posterPath: show.poster_path,
       });
+    }
+  }, [show, addItem]);
+
+  // Track for provider coverage (dedupe by id+region per session)
+  useEffect(() => {
+    if (show) {
       const trackKey = `${show.id}:${region}`;
-      if (trackedRef.current !== trackKey) {
-        trackedRef.current = trackKey;
+      if (!trackedRef.current.has(trackKey)) {
+        trackedRef.current.add(trackKey);
         trackTitle({
           mediaType: 'tv',
           tmdbId: show.id,
@@ -90,7 +96,7 @@ const TvDetails = () => {
         });
       }
     }
-  }, [show, addItem, trackTitle, region]);
+  }, [show, trackTitle, region]);
 
   const backdropUrl = show ? getImageUrl(show.backdrop_path, "original") : null;
   const posterUrl = show ? getImageUrl(show.poster_path, "w500") : null;

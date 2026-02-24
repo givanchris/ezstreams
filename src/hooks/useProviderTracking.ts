@@ -2,11 +2,18 @@ import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { tmdbFetch, WatchProvidersResponse } from "@/lib/tmdb";
 import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "@/hooks/use-toast";
 
 interface ProviderStats {
   totalTitles: number;
   providerCounts: Record<string, number>;
   loading: boolean;
+}
+
+interface TrackResult {
+  success: boolean;
+  error?: string;
+  message?: string;
 }
 
 // localStorage cache for provider lookups (24h TTL)
@@ -18,7 +25,7 @@ interface CachedProviders {
   timestamp: number;
 }
 
-function getProviderCacheKey(mediaType: string, tmdbId: number, region: string): string {
+function getCacheKey(mediaType: string, tmdbId: number, region: string): string {
   return `${mediaType}:${tmdbId}:${region}`;
 }
 
@@ -51,7 +58,7 @@ function setCachedProviders(key: string, providers: string[]): void {
   }
 }
 
-// Concurrency limiter
+// Simple concurrency limiter
 let pending = false;
 const queue: (() => void)[] = [];
 
@@ -62,10 +69,12 @@ function processQueue() {
   next();
 }
 
-/**
- * Hook to track a title selection and update provider coverage stats.
- * Call `trackTitle` when a detail page loads with valid data.
- */
+// Store last track result for debug mode
+let lastTrackResult: TrackResult | null = null;
+export function getLastTrackResult(): TrackResult | null {
+  return lastTrackResult;
+}
+
 export function useProviderTracking(region: string = "US") {
   const { user } = useAuth();
   const [stats, setStats] = useState<ProviderStats>({
@@ -74,7 +83,6 @@ export function useProviderTracking(region: string = "US") {
     loading: true,
   });
 
-  // Load current stats for this region
   const loadStats = useCallback(async () => {
     if (!user) {
       setStats({ totalTitles: 0, providerCounts: {}, loading: false });
@@ -98,6 +106,7 @@ export function useProviderTracking(region: string = "US") {
       });
     } catch (err) {
       console.error("Failed to load provider stats:", err);
+      toast({ title: "Error", description: "Failed to load analyzer data", variant: "destructive" });
       setStats((prev) => ({ ...prev, loading: false }));
     }
   }, [user, region]);
@@ -112,130 +121,177 @@ export function useProviderTracking(region: string = "US") {
       tmdbId: number;
       title: string;
       posterPath: string | null;
-    }) => {
-      if (!user) return;
+    }): Promise<TrackResult> => {
+      if (!user) {
+        const result: TrackResult = { success: false, error: "User not logged in" };
+        lastTrackResult = result;
+        return result;
+      }
 
       const { mediaType, tmdbId, title, posterPath } = params;
 
-      const doWork = async () => {
-        try {
-          // 1. Try to upsert into history. If conflict, it's not new.
-          const { data: upsertData, error: upsertError } = await supabase
-            .from("user_title_history")
-            .upsert(
-              {
-                user_id: user.id,
-                media_type: mediaType,
-                tmdb_id: tmdbId,
-                title,
-                poster_path: posterPath,
-                region,
-                selected_at: new Date().toISOString(),
-              },
-              { onConflict: "user_id,media_type,tmdb_id,region", ignoreDuplicates: false }
-            )
-            .select("id, flatrate_providers")
-            .single();
+      return new Promise<TrackResult>((resolve) => {
+        const doWork = async () => {
+          try {
+            // 1. Check if already tracked
+            const { data: existing, error: checkErr } = await supabase
+              .from("user_title_history")
+              .select("id, flatrate_providers")
+              .eq("user_id", user.id)
+              .eq("media_type", mediaType)
+              .eq("tmdb_id", tmdbId)
+              .eq("region", region)
+              .maybeSingle();
 
-          if (upsertError) {
-            console.error("Upsert title history error:", upsertError);
-            return;
-          }
+            if (checkErr) {
+              console.error("Check existing title error:", checkErr);
+              toast({ title: "Tracking Error", description: checkErr.message, variant: "destructive" });
+              const result: TrackResult = { success: false, error: checkErr.message };
+              lastTrackResult = result;
+              resolve(result);
+              return;
+            }
 
-          // If flatrate_providers already populated, this title was already counted
-          const existingProviders = upsertData?.flatrate_providers;
-          if (
-            existingProviders &&
-            Array.isArray(existingProviders) &&
-            existingProviders.length > 0
-          ) {
-            // Already tracked, skip stats update
-            return;
-          }
+            // If exists and already has providers data (not null), skip
+            if (existing && existing.flatrate_providers !== null) {
+              const result: TrackResult = { success: true, message: "Already tracked" };
+              lastTrackResult = result;
+              resolve(result);
+              return;
+            }
 
-          // Also check if it's a "0 providers" case that was already processed
-          // We use a special marker: if flatrate_providers is an empty array AND
-          // we already have a record, don't recount. We'll use null vs [] to distinguish.
-          if (existingProviders !== null && Array.isArray(existingProviders)) {
-            return; // Already processed (empty array = no flatrate providers found)
-          }
+            // 2. Insert or get existing record
+            let recordId: string;
+            if (existing) {
+              // Exists but flatrate_providers is null — needs processing
+              recordId = existing.id;
+            } else {
+              // Insert new
+              const { data: insertData, error: insertErr } = await supabase
+                .from("user_title_history")
+                .insert({
+                  user_id: user.id,
+                  media_type: mediaType,
+                  tmdb_id: tmdbId,
+                  title,
+                  poster_path: posterPath,
+                  region,
+                  selected_at: new Date().toISOString(),
+                })
+                .select("id")
+                .single();
 
-          // 2. Fetch flatrate providers from TMDB
-          const cacheKey = getProviderCacheKey(mediaType, tmdbId, region);
-          let flatrateNames = getCachedProviders(cacheKey);
+              if (insertErr) {
+                // Could be a race condition duplicate
+                if (insertErr.code === "23505") {
+                  const result: TrackResult = { success: true, message: "Already tracked (race)" };
+                  lastTrackResult = result;
+                  resolve(result);
+                  return;
+                }
+                console.error("Insert title history error:", insertErr);
+                toast({ title: "Tracking Error", description: insertErr.message, variant: "destructive" });
+                const result: TrackResult = { success: false, error: insertErr.message };
+                lastTrackResult = result;
+                resolve(result);
+                return;
+              }
+              recordId = insertData.id;
+            }
 
-          if (flatrateNames === null) {
-            try {
-              const endpoint =
-                mediaType === "movie"
+            // 3. Fetch flatrate providers
+            const cacheKey = getCacheKey(mediaType, tmdbId, region);
+            let flatrateNames = getCachedProviders(cacheKey);
+
+            if (flatrateNames === null) {
+              try {
+                const endpoint = mediaType === "movie"
                   ? `/movie/${tmdbId}/watch/providers`
                   : `/tv/${tmdbId}/watch/providers`;
-
-              const providerData = await tmdbFetch<WatchProvidersResponse>(endpoint);
-              const regionData = providerData.results?.[region];
-              const flatrateProviders = regionData?.flatrate || [];
-              flatrateNames = flatrateProviders.map((p) => p.provider_name);
-              setCachedProviders(cacheKey, flatrateNames);
-            } catch (err) {
-              console.error("Failed to fetch providers for tracking:", err);
-              flatrateNames = [];
-              setCachedProviders(cacheKey, flatrateNames);
+                const providerData = await tmdbFetch<WatchProvidersResponse>(endpoint);
+                const regionData = providerData.results?.[region];
+                const flatrateProviders = regionData?.flatrate || [];
+                flatrateNames = flatrateProviders.map((p) => p.provider_name);
+                setCachedProviders(cacheKey, flatrateNames);
+              } catch (err) {
+                console.error("Failed to fetch providers:", err);
+                flatrateNames = [];
+                setCachedProviders(cacheKey, flatrateNames);
+              }
             }
+
+            // 4. Update history record with provider data
+            const { error: updateErr } = await supabase
+              .from("user_title_history")
+              .update({ flatrate_providers: flatrateNames })
+              .eq("id", recordId);
+
+            if (updateErr) {
+              console.error("Update flatrate_providers error:", updateErr);
+            }
+
+            // 5. Update aggregated stats
+            const { data: currentStats } = await supabase
+              .from("user_provider_stats")
+              .select("total_titles, provider_counts")
+              .eq("user_id", user.id)
+              .eq("region", region)
+              .maybeSingle();
+
+            const prevTotal = currentStats?.total_titles ?? 0;
+            const prevCounts = (currentStats?.provider_counts as Record<string, number>) ?? {};
+
+            const newTotal = prevTotal + 1;
+            const newCounts = { ...prevCounts };
+            for (const name of flatrateNames) {
+              newCounts[name] = (newCounts[name] ?? 0) + 1;
+            }
+
+            const { error: statsErr } = await supabase.from("user_provider_stats").upsert(
+              {
+                user_id: user.id,
+                region,
+                total_titles: newTotal,
+                provider_counts: newCounts,
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: "user_id,region" }
+            );
+
+            if (statsErr) {
+              console.error("Upsert provider stats error:", statsErr);
+              toast({ title: "Stats Error", description: statsErr.message, variant: "destructive" });
+              const result: TrackResult = { success: false, error: statsErr.message };
+              lastTrackResult = result;
+              resolve(result);
+              return;
+            }
+
+            // 6. Update local state
+            setStats({
+              totalTitles: newTotal,
+              providerCounts: newCounts,
+              loading: false,
+            });
+
+            const result: TrackResult = { success: true, message: `Tracked: ${title}` };
+            lastTrackResult = result;
+            resolve(result);
+          } catch (err) {
+            console.error("Provider tracking error:", err);
+            toast({ title: "Tracking Error", description: "Failed to track title", variant: "destructive" });
+            const result: TrackResult = { success: false, error: (err as Error).message };
+            lastTrackResult = result;
+            resolve(result);
+          } finally {
+            pending = false;
+            processQueue();
           }
+        };
 
-          // 3. Update the history record with provider data
-          await supabase
-            .from("user_title_history")
-            .update({ flatrate_providers: flatrateNames })
-            .eq("id", upsertData.id);
-
-          // 4. Update aggregated stats
-          // Read current stats
-          const { data: currentStats } = await supabase
-            .from("user_provider_stats")
-            .select("total_titles, provider_counts")
-            .eq("user_id", user.id)
-            .eq("region", region)
-            .maybeSingle();
-
-          const prevTotal = currentStats?.total_titles ?? 0;
-          const prevCounts =
-            (currentStats?.provider_counts as Record<string, number>) ?? {};
-
-          const newTotal = prevTotal + 1;
-          const newCounts = { ...prevCounts };
-          for (const name of flatrateNames) {
-            newCounts[name] = (newCounts[name] ?? 0) + 1;
-          }
-
-          await supabase.from("user_provider_stats").upsert(
-            {
-              user_id: user.id,
-              region,
-              total_titles: newTotal,
-              provider_counts: newCounts,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: "user_id,region" }
-          );
-
-          // 5. Update local state optimistically
-          setStats({
-            totalTitles: newTotal,
-            providerCounts: newCounts,
-            loading: false,
-          });
-        } catch (err) {
-          console.error("Provider tracking error:", err);
-        } finally {
-          pending = false;
-          processQueue();
-        }
-      };
-
-      // Enqueue to limit concurrency
-      queue.push(doWork);
-      processQueue();
+        queue.push(doWork);
+        processQueue();
+      });
     },
     [user, region]
   );
@@ -261,9 +317,7 @@ export function useProviderTracking(region: string = "US") {
         const raw = localStorage.getItem(PROVIDER_CACHE_KEY);
         if (raw) {
           const cache: Record<string, CachedProviders> = JSON.parse(raw);
-          const keysToDelete = Object.keys(cache).filter((k) =>
-            k.endsWith(`:${region}`)
-          );
+          const keysToDelete = Object.keys(cache).filter((k) => k.endsWith(`:${region}`));
           for (const key of keysToDelete) delete cache[key];
           localStorage.setItem(PROVIDER_CACHE_KEY, JSON.stringify(cache));
         }
@@ -272,8 +326,10 @@ export function useProviderTracking(region: string = "US") {
       }
 
       setStats({ totalTitles: 0, providerCounts: {}, loading: false });
+      toast({ title: "Reset Complete", description: "Analyzer data cleared for this region" });
     } catch (err) {
       console.error("Failed to reset stats:", err);
+      toast({ title: "Error", description: "Failed to reset data", variant: "destructive" });
     }
   }, [user, region]);
 
