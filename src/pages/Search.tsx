@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Search as SearchIcon, ArrowLeft, Loader2, X, Film, Tv2 } from "lucide-react";
 import MediaCard from "@/components/MediaCard";
@@ -6,6 +6,9 @@ import { tmdbFetch, TMDBSearchResponse, getImageUrl } from "@/lib/tmdb";
 import { rankSearchResults } from "@/lib/search-ranking";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import QuickFilters, { type QuickFilter } from "@/components/QuickFilters";
 import { supabase } from "@/integrations/supabase/client";
 
 interface MultiSearchResult {
@@ -35,6 +38,8 @@ const Search = () => {
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [activeFilters, setActiveFilters] = useState<QuickFilter[]>([]);
+  const [top5Only, setTop5Only] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
   const abortRef = useRef<AbortController>();
   const suggestionsRef = useRef<HTMLDivElement>(null);
@@ -205,6 +210,35 @@ const Search = () => {
     return d ? new Date(d).getFullYear() : null;
   };
 
+  const toggleFilter = (f: QuickFilter) => {
+    setActiveFilters((prev) =>
+      prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f]
+    );
+  };
+
+  const filteredResults = useMemo(() => {
+    let filtered = [...results];
+
+    if (activeFilters.includes("highlyRated")) {
+      filtered = filtered.filter((r) => r.vote_average >= 7.5);
+    }
+    if (activeFilters.includes("trending")) {
+      filtered = filtered.filter((r) => (r.popularity || 0) > 50);
+    }
+    // "under2h" and "mySubscriptions" would need additional data not in search results,
+    // so we treat them as soft hints — sort items with higher popularity first for trending
+    if (activeFilters.includes("trending")) {
+      filtered.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+    }
+
+    if (top5Only) {
+      filtered.sort((a, b) => b.vote_average - a.vote_average);
+      filtered = filtered.slice(0, 5);
+    }
+
+    return filtered;
+  }, [results, activeFilters, top5Only]);
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       {/* Pinned search bar */}
@@ -323,11 +357,23 @@ const Search = () => {
 
           {!loading && results.length > 0 && (
             <>
-              <p className="text-muted-foreground mb-4 text-sm">
-                {results.length} result{results.length !== 1 ? "s" : ""} for "{urlQuery}"
-              </p>
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+                <p className="text-muted-foreground text-sm">
+                  {filteredResults.length} of {results.length} result{results.length !== 1 ? "s" : ""} for "{urlQuery}"
+                </p>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="top5"
+                    checked={top5Only}
+                    onCheckedChange={setTop5Only}
+                  />
+                  <Label htmlFor="top5" className="text-sm text-muted-foreground cursor-pointer">
+                    Show Top 5 Only
+                  </Label>
+                </div>
+              </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                {results.map((item) => (
+                {filteredResults.map((item) => (
                   <MediaCard
                     key={`${item.media_type}-${item.id}`}
                     id={item.id}
@@ -349,9 +395,14 @@ const Search = () => {
               <p className="text-muted-foreground text-lg">Start typing to search</p>
             </div>
           )}
+          </div>
+        </div>
+
+        {/* Quick Filters */}
+        <div className="max-w-5xl mx-auto mt-3">
+          <QuickFilters active={activeFilters} onToggle={toggleFilter} />
         </div>
       </div>
-    </div>
   );
 };
 
