@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { submitSearch } from "@/lib/navigation";
 import { useQuery } from "@tanstack/react-query";
 import SearchAutocomplete from "@/components/SearchAutocomplete";
 import StreamingServiceCard from "@/components/StreamingServiceCard";
@@ -11,6 +10,8 @@ import DecisionMode from "@/components/DecisionMode";
 import Footer from "@/components/Footer";
 import RecentlyViewedRow from "@/components/RecentlyViewedRow";
 import { ArrowRight, Sparkles, Zap, Shield, PiggyBank } from "lucide-react";
+import MoodChips, { MoodPreset } from "@/components/MoodChips";
+import SearchFilterBar, { SearchFilters, DEFAULT_FILTERS } from "@/components/SearchFilterBar";
 import { Button } from "@/components/ui/button";
 import { fetchMediaList, tmdbFetch, TMDBMovie, TMDBTvShow, TMDBSearchResponse } from "@/lib/tmdb";
 
@@ -77,6 +78,7 @@ const featuredContent = [
 const Index = () => {
   const navigate = useNavigate();
   const [connectedServices, setConnectedServices] = useState<string[]>(["netflix", "disney", "hulu", "hbo", "prime", "apple"]);
+  const [homeFilters, setHomeFilters] = useState<SearchFilters>(DEFAULT_FILTERS);
 
   const toggleService = (serviceId: string) => {
     setConnectedServices((prev) =>
@@ -86,8 +88,30 @@ const Index = () => {
     );
   };
 
+  const buildFilterParams = (filters: SearchFilters) => {
+    const params = new URLSearchParams();
+    if (filters.genre) params.set("genre", filters.genre);
+    if (filters.sort) params.set("sort", filters.sort);
+    if (filters.streamingOnly) params.set("streamingOnly", "1");
+    if (filters.under2h) params.set("under2h", "1");
+    return params;
+  };
+
   const handleSearch = (query: string) => {
-    submitSearch(query, navigate);
+    const params = buildFilterParams(homeFilters);
+    const trimmed = query.trim();
+    if (trimmed) params.set("q", trimmed);
+    if ([...params].length > 0) {
+      navigate(`/search?${params.toString()}`);
+    }
+  };
+
+  const handleMoodSelect = (preset: MoodPreset) => {
+    const params = new URLSearchParams();
+    if (preset.genre) params.set("genre", preset.genre);
+    if (preset.under2h) params.set("under2h", "1");
+    if (preset.sort) params.set("sort", preset.sort);
+    navigate(`/search?${params.toString()}`);
   };
 
   // Fetch trending movies
@@ -182,6 +206,11 @@ const Index = () => {
                   {term}
                 </button>
               ))}
+            </div>
+
+            <div className="max-w-3xl mx-auto mt-6 space-y-4">
+              <MoodChips onSelect={handleMoodSelect} />
+              <SearchFilterBar filters={homeFilters} onChange={setHomeFilters} />
             </div>
           </div>
         </div>
