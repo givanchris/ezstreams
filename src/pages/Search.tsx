@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { Search as SearchIcon, ArrowLeft, Loader2, X, Film, Tv2 } from "lucide-react";
+import { Search as SearchIcon, ArrowLeft, Loader2, X, Film, Tv2, Tag } from "lucide-react";
 import MediaCard from "@/components/MediaCard";
 import { tmdbFetch, TMDBSearchResponse, getImageUrl } from "@/lib/tmdb";
 import { rankSearchResults } from "@/lib/search-ranking";
@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import QuickFilters, { type QuickFilter } from "@/components/QuickFilters";
 import { supabase } from "@/integrations/supabase/client";
+import { loadGenres, detectGenre, type GenreMatch } from "@/lib/genre-detection";
 
 interface MultiSearchResult {
   id: number;
@@ -40,6 +41,7 @@ const Search = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [activeFilters, setActiveFilters] = useState<QuickFilter[]>([]);
   const [top5Only, setTop5Only] = useState(false);
+  const [genreMatch, setGenreMatch] = useState<GenreMatch | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
   const abortRef = useRef<AbortController>();
   const suggestionsRef = useRef<HTMLDivElement>(null);
@@ -52,17 +54,62 @@ const Search = () => {
     setError(null);
     setHasSearched(true);
     setShowSuggestions(false);
+    setGenreMatch(null);
 
     try {
-      const data = await tmdbFetch<TMDBSearchResponse<MultiSearchResult>>(
-        '/search/multi',
-        { query: searchQuery.trim(), page: '1', include_adult: 'false' }
-      );
-      const filtered = data.results.filter(
-        (r): r is MultiSearchResult & { media_type: 'movie' | 'tv' } =>
-          r.media_type === 'movie' || r.media_type === 'tv'
-      );
-      setResults(rankSearchResults(filtered, searchQuery.trim()) as MultiSearchResult[]);
+      // Try genre detection first
+      const genres = await loadGenres();
+      const match = detectGenre(searchQuery, genres.movie, genres.tv);
+
+      if (match && (match.movieGenreIds.length > 0 || match.tvGenreIds.length > 0)) {
+        setGenreMatch(match);
+        // Fetch from discover endpoints in parallel
+        const fetches: Promise<TMDBSearchResponse<MultiSearchResult>>[] = [];
+
+        if (match.movieGenreIds.length > 0) {
+          fetches.push(
+            tmdbFetch<TMDBSearchResponse<MultiSearchResult>>('/discover/movie', {
+              with_genres: match.movieGenreIds.join(','),
+              sort_by: 'popularity.desc',
+              page: '1',
+              include_adult: 'false',
+            }).then(data => ({
+              ...data,
+              results: data.results.map(r => ({ ...r, media_type: 'movie' as const })),
+            }))
+          );
+        }
+        if (match.tvGenreIds.length > 0) {
+          fetches.push(
+            tmdbFetch<TMDBSearchResponse<MultiSearchResult>>('/discover/tv', {
+              with_genres: match.tvGenreIds.join(','),
+              sort_by: 'popularity.desc',
+              page: '1',
+              include_adult: 'false',
+            }).then(data => ({
+              ...data,
+              results: data.results.map(r => ({ ...r, media_type: 'tv' as const })),
+            }))
+          );
+        }
+
+        const responses = await Promise.all(fetches);
+        const combined = responses.flatMap(r => r.results);
+        // Sort by popularity desc
+        combined.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+        setResults(combined);
+      } else {
+        // Normal title search
+        const data = await tmdbFetch<TMDBSearchResponse<MultiSearchResult>>(
+          '/search/multi',
+          { query: searchQuery.trim(), page: '1', include_adult: 'false' }
+        );
+        const filtered = data.results.filter(
+          (r): r is MultiSearchResult & { media_type: 'movie' | 'tv' } =>
+            r.media_type === 'movie' || r.media_type === 'tv'
+        );
+        setResults(rankSearchResults(filtered, searchQuery.trim()) as MultiSearchResult[]);
+      }
     } catch (err) {
       console.error("Search error:", err);
       setError(err instanceof Error ? err.message : "Failed to search");
@@ -357,6 +404,14 @@ const Search = () => {
 
           {!loading && results.length > 0 && (
             <>
+              {genreMatch && (
+                <div className="flex items-center gap-2 mb-3">
+                  <Tag className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-medium text-foreground">
+                    Genre results: {genreMatch.genreNames.join(' + ')}
+                  </span>
+                </div>
+              )}
               <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
                 <p className="text-muted-foreground text-sm">
                   {filteredResults.length} of {results.length} result{results.length !== 1 ? "s" : ""} for "{urlQuery}"
