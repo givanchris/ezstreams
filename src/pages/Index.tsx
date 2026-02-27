@@ -7,6 +7,7 @@ import StreamingServiceCard from "@/components/StreamingServiceCard";
 import ContentCard from "@/components/ContentCard";
 import SavingsAnalyzer from "@/components/SavingsAnalyzer";
 import MediaRow from "@/components/MediaRow";
+import DecisionMode from "@/components/DecisionMode";
 import Footer from "@/components/Footer";
 import RecentlyViewedRow from "@/components/RecentlyViewedRow";
 import { ArrowRight, Sparkles, Zap, Shield, PiggyBank } from "lucide-react";
@@ -186,6 +187,16 @@ const Index = () => {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* Decision Mode */}
+      <section className="py-12 px-6">
+        <div className="max-w-7xl mx-auto">
+          <DecisionMode
+            movies={trendingMovies?.results || []}
+            tvShows={trendingTv?.results || []}
+          />
         </div>
       </section>
 
