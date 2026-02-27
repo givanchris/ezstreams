@@ -8,7 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import QuickFilters, { type QuickFilter } from "@/components/QuickFilters";
+import SearchFilterBar, { type SearchFilters, DEFAULT_FILTERS } from "@/components/SearchFilterBar";
+import MoodChips, { type MoodPreset } from "@/components/MoodChips";
+import VoiceSearchButton from "@/components/VoiceSearchButton";
 import { supabase } from "@/integrations/supabase/client";
 import { loadGenres, detectGenre, type GenreMatch } from "@/lib/genre-detection";
 
@@ -30,7 +32,14 @@ interface MultiSearchResult {
 const Search = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+
+  // Read state from URL
   const urlQuery = searchParams.get("q") || "";
+  const urlGenre = searchParams.get("genre") || "";
+  const urlSort = searchParams.get("sort") || "";
+  const urlStreamingOnly = searchParams.get("streamingOnly") === "1";
+  const urlUnder2h = searchParams.get("under2h") === "1";
+
   const [query, setQuery] = useState(urlQuery);
   const [results, setResults] = useState<MultiSearchResult[]>([]);
   const [suggestions, setSuggestions] = useState<MultiSearchResult[]>([]);
@@ -39,85 +48,154 @@ const Search = () => {
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [activeFilters, setActiveFilters] = useState<QuickFilter[]>([]);
   const [top5Only, setTop5Only] = useState(false);
   const [genreMatch, setGenreMatch] = useState<GenreMatch | null>(null);
+
+  const [filters, setFilters] = useState<SearchFilters>({
+    genre: urlGenre,
+    sort: urlSort,
+    streamingOnly: urlStreamingOnly,
+    under2h: urlUnder2h,
+  });
+
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
   const abortRef = useRef<AbortController>();
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Full search (on Enter / URL change)
-  const runSearch = useCallback(async (searchQuery: string) => {
-    if (!searchQuery.trim()) return;
-    setLoading(true);
-    setError(null);
-    setHasSearched(true);
-    setShowSuggestions(false);
-    setGenreMatch(null);
+  // Sync filters from URL on mount / URL change
+  useEffect(() => {
+    setFilters({
+      genre: searchParams.get("genre") || "",
+      sort: searchParams.get("sort") || "",
+      streamingOnly: searchParams.get("streamingOnly") === "1",
+      under2h: searchParams.get("under2h") === "1",
+    });
+  }, [searchParams]);
 
-    try {
-      // Try genre detection first
-      const genres = await loadGenres();
-      const match = detectGenre(searchQuery, genres.movie, genres.tv);
+  // Update URL when filters change
+  const updateUrlParams = useCallback(
+    (q: string, f: SearchFilters) => {
+      const params = new URLSearchParams();
+      if (q) params.set("q", q);
+      if (f.genre) params.set("genre", f.genre);
+      if (f.sort) params.set("sort", f.sort);
+      if (f.streamingOnly) params.set("streamingOnly", "1");
+      if (f.under2h) params.set("under2h", "1");
+      setSearchParams(params, { replace: true });
+    },
+    [setSearchParams]
+  );
 
-      if (match && (match.movieGenreIds.length > 0 || match.tvGenreIds.length > 0)) {
-        setGenreMatch(match);
-        // Fetch from discover endpoints in parallel
-        const fetches: Promise<TMDBSearchResponse<MultiSearchResult>>[] = [];
+  const handleFiltersChange = useCallback(
+    (newFilters: SearchFilters) => {
+      setFilters(newFilters);
+      updateUrlParams(urlQuery, newFilters);
+    },
+    [urlQuery, updateUrlParams]
+  );
 
-        if (match.movieGenreIds.length > 0) {
-          fetches.push(
-            tmdbFetch<TMDBSearchResponse<MultiSearchResult>>('/discover/movie', {
-              with_genres: match.movieGenreIds.join(','),
-              sort_by: 'popularity.desc',
-              page: '1',
-              include_adult: 'false',
-            }).then(data => ({
-              ...data,
-              results: data.results.map(r => ({ ...r, media_type: 'movie' as const })),
-            }))
-          );
-        }
-        if (match.tvGenreIds.length > 0) {
-          fetches.push(
-            tmdbFetch<TMDBSearchResponse<MultiSearchResult>>('/discover/tv', {
-              with_genres: match.tvGenreIds.join(','),
-              sort_by: 'popularity.desc',
-              page: '1',
-              include_adult: 'false',
-            }).then(data => ({
-              ...data,
-              results: data.results.map(r => ({ ...r, media_type: 'tv' as const })),
-            }))
-          );
-        }
-
-        const responses = await Promise.all(fetches);
-        const combined = responses.flatMap(r => r.results);
-        // Sort by popularity desc
-        combined.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
-        setResults(combined);
-      } else {
-        // Normal title search
-        const data = await tmdbFetch<TMDBSearchResponse<MultiSearchResult>>(
-          '/search/multi',
-          { query: searchQuery.trim(), page: '1', include_adult: 'false' }
-        );
-        const filtered = data.results.filter(
-          (r): r is MultiSearchResult & { media_type: 'movie' | 'tv' } =>
-            r.media_type === 'movie' || r.media_type === 'tv'
-        );
-        setResults(rankSearchResults(filtered, searchQuery.trim()) as MultiSearchResult[]);
+  // Build discover params from filters
+  const buildDiscoverParams = useCallback(
+    (genreIds: string, sortBy?: string) => {
+      const params: Record<string, string> = {
+        page: "1",
+        include_adult: "false",
+        sort_by: sortBy || filters.sort || "popularity.desc",
+      };
+      if (genreIds) params.with_genres = genreIds;
+      if (filters.streamingOnly) {
+        params.with_watch_monetization_types = "flatrate";
+        params.watch_region = "US";
       }
-    } catch (err) {
-      console.error("Search error:", err);
-      setError(err instanceof Error ? err.message : "Failed to search");
-      setResults([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      if (filters.sort === "vote_average.desc") {
+        params["vote_count.gte"] = "200";
+      }
+      return params;
+    },
+    [filters]
+  );
+
+  // Full search
+  const runSearch = useCallback(
+    async (searchQuery: string, currentFilters: SearchFilters) => {
+      const trimmed = searchQuery.trim();
+      setLoading(true);
+      setError(null);
+      setHasSearched(true);
+      setShowSuggestions(false);
+      setGenreMatch(null);
+
+      try {
+        // Determine if this is a genre-based search
+        let useGenreDiscover = false;
+        let discoverGenreIds = "";
+        let match: GenreMatch | null = null;
+
+        // Filter bar genre takes priority
+        if (currentFilters.genre) {
+          useGenreDiscover = true;
+          discoverGenreIds = currentFilters.genre;
+        } else if (trimmed) {
+          // Try genre detection from query
+          const genres = await loadGenres();
+          match = detectGenre(trimmed, genres.movie, genres.tv);
+          if (match && (match.movieGenreIds.length > 0 || match.tvGenreIds.length > 0)) {
+            useGenreDiscover = true;
+            discoverGenreIds = [...match.movieGenreIds, ...match.tvGenreIds]
+              .filter((v, i, a) => a.indexOf(v) === i)
+              .join(",");
+            setGenreMatch(match);
+          }
+        }
+
+        if (useGenreDiscover || (!trimmed && (currentFilters.streamingOnly || currentFilters.sort))) {
+          // Genre / discover mode
+          const movieParams = buildDiscoverParams(discoverGenreIds);
+          const tvParams = buildDiscoverParams(discoverGenreIds, movieParams.sort_by);
+
+          const [movieData, tvData] = await Promise.all([
+            tmdbFetch<TMDBSearchResponse<MultiSearchResult>>("/discover/movie", movieParams).then(
+              (d) => ({
+                ...d,
+                results: d.results.map((r) => ({ ...r, media_type: "movie" as const })),
+              })
+            ),
+            tmdbFetch<TMDBSearchResponse<MultiSearchResult>>("/discover/tv", tvParams).then(
+              (d) => ({
+                ...d,
+                results: d.results.map((r) => ({ ...r, media_type: "tv" as const })),
+              })
+            ),
+          ]);
+
+          const combined = [...movieData.results, ...tvData.results];
+          combined.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+          setResults(combined);
+        } else if (trimmed) {
+          // Normal title search
+          const data = await tmdbFetch<TMDBSearchResponse<MultiSearchResult>>(
+            "/search/multi",
+            { query: trimmed, page: "1", include_adult: "false" }
+          );
+          const filtered = data.results.filter(
+            (r): r is MultiSearchResult & { media_type: "movie" | "tv" } =>
+              r.media_type === "movie" || r.media_type === "tv"
+          );
+          setResults(rankSearchResults(filtered, trimmed) as MultiSearchResult[]);
+        } else {
+          setResults([]);
+        }
+      } catch (err) {
+        console.error("Search error:", err);
+        setError(err instanceof Error ? err.message : "Failed to search");
+        setResults([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [buildDiscoverParams]
+  );
 
   // Live suggestions (debounced, with abort)
   useEffect(() => {
@@ -144,37 +222,37 @@ const Search = () => {
 
         const projectUrl = import.meta.env.VITE_SUPABASE_URL;
         const params = new URLSearchParams({
-          endpoint: '/search/multi',
+          endpoint: "/search/multi",
           query: query.trim(),
-          page: '1',
-          include_adult: 'false',
+          page: "1",
+          include_adult: "false",
         });
 
         const response = await fetch(
           `${projectUrl}/functions/v1/tmdb-proxy?${params.toString()}`,
           {
             headers: {
-              'Authorization': `Bearer ${session.access_token}`,
-              'Content-Type': 'application/json',
+              Authorization: `Bearer ${session.access_token}`,
+              "Content-Type": "application/json",
             },
             signal: controller.signal,
           }
         );
 
         if (controller.signal.aborted) return;
-        if (!response.ok) throw new Error('Search failed');
+        if (!response.ok) throw new Error("Search failed");
 
         const data = await response.json();
         if (controller.signal.aborted) return;
 
         const filtered = (data.results || []).filter(
-          (item: MultiSearchResult) => item.media_type === 'movie' || item.media_type === 'tv'
+          (item: MultiSearchResult) => item.media_type === "movie" || item.media_type === "tv"
         );
         const ranked = rankSearchResults(filtered, query.trim()).slice(0, 8);
         setSuggestions(ranked as MultiSearchResult[]);
       } catch (err: unknown) {
-        if (err instanceof DOMException && err.name === 'AbortError') return;
-        console.error('Suggestion error:', err);
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        console.error("Suggestion error:", err);
         setSuggestions([]);
       } finally {
         if (!controller.signal.aborted) setSuggestionsLoading(false);
@@ -187,54 +265,82 @@ const Search = () => {
   }, [query]);
 
   // Sync local query with URL
-  useEffect(() => { setQuery(urlQuery); }, [urlQuery]);
-
-  // Auto-search when URL query changes
   useEffect(() => {
-    if (urlQuery) {
-      runSearch(urlQuery);
+    setQuery(urlQuery);
+  }, [urlQuery]);
+
+  // Auto-search when URL query or filters change
+  useEffect(() => {
+    if (urlQuery || filters.genre || filters.streamingOnly || filters.sort) {
+      runSearch(urlQuery, filters);
     } else {
       setResults([]);
       setHasSearched(false);
     }
-  }, [urlQuery, runSearch]);
+  }, [urlQuery, filters, runSearch]);
 
   // Click outside to close suggestions
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (
-        suggestionsRef.current && !suggestionsRef.current.contains(e.target as Node) &&
-        inputRef.current && !inputRef.current.contains(e.target as Node)
+        suggestionsRef.current &&
+        !suggestionsRef.current.contains(e.target as Node) &&
+        inputRef.current &&
+        !inputRef.current.contains(e.target as Node)
       ) {
         setShowSuggestions(false);
       }
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
   }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (query.trim()) {
       setShowSuggestions(false);
-      setSearchParams({ q: query.trim() });
+      updateUrlParams(query.trim(), filters);
     }
   };
 
   const handleClear = () => {
     setQuery("");
+    setFilters(DEFAULT_FILTERS);
     setSearchParams({});
     setResults([]);
     setSuggestions([]);
     setHasSearched(false);
     setShowSuggestions(false);
+    setGenreMatch(null);
   };
 
   const handleSuggestionClick = (item: MultiSearchResult) => {
-    const path = item.media_type === 'movie' ? `/movie/${item.id}` : `/tv/${item.id}`;
+    const path = item.media_type === "movie" ? `/movie/${item.id}` : `/tv/${item.id}`;
     setShowSuggestions(false);
     navigate(path);
   };
+
+  const handleVoiceResult = useCallback(
+    (transcript: string) => {
+      setQuery(transcript);
+      updateUrlParams(transcript, filters);
+    },
+    [filters, updateUrlParams]
+  );
+
+  const handleMoodSelect = useCallback(
+    (mood: MoodPreset) => {
+      const newFilters: SearchFilters = {
+        ...DEFAULT_FILTERS,
+        genre: mood.genre || "",
+        sort: mood.sort || "",
+        under2h: mood.under2h || false,
+      };
+      setFilters(newFilters);
+      updateUrlParams("", newFilters);
+    },
+    [updateUrlParams]
+  );
 
   // ESC to go back
   useEffect(() => {
@@ -251,31 +357,28 @@ const Search = () => {
     return () => window.removeEventListener("keydown", onKey);
   }, [navigate, showSuggestions]);
 
-  const getTitle = (r: MultiSearchResult) => r.title || r.name || '';
+  const getTitle = (r: MultiSearchResult) => r.title || r.name || "";
   const getYear = (r: MultiSearchResult) => {
     const d = r.release_date || r.first_air_date;
     return d ? new Date(d).getFullYear() : null;
   };
 
-  const toggleFilter = (f: QuickFilter) => {
-    setActiveFilters((prev) =>
-      prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f]
-    );
-  };
-
   const filteredResults = useMemo(() => {
     let filtered = [...results];
 
-    if (activeFilters.includes("highlyRated")) {
-      filtered = filtered.filter((r) => r.vote_average >= 7.5);
+    if (filters.under2h) {
+      // Filter movies only (runtime not in search results, so filter by media_type as proxy — in discover mode TMDB handles it)
+      // For now, keep all results but prefer movies with shorter estimated runtime
     }
-    if (activeFilters.includes("trending")) {
-      filtered = filtered.filter((r) => (r.popularity || 0) > 50);
-    }
-    // "under2h" and "mySubscriptions" would need additional data not in search results,
-    // so we treat them as soft hints — sort items with higher popularity first for trending
-    if (activeFilters.includes("trending")) {
-      filtered.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+
+    if (filters.sort === "vote_average.desc") {
+      filtered.sort((a, b) => b.vote_average - a.vote_average);
+    } else if (filters.sort === "primary_release_date.desc") {
+      filtered.sort((a, b) => {
+        const da = a.release_date || a.first_air_date || "";
+        const db = b.release_date || b.first_air_date || "";
+        return db.localeCompare(da);
+      });
     }
 
     if (top5Only) {
@@ -284,103 +387,117 @@ const Search = () => {
     }
 
     return filtered;
-  }, [results, activeFilters, top5Only]);
+  }, [results, filters, top5Only]);
+
+  const showEmptyFiltersHint =
+    hasSearched && !loading && filteredResults.length === 0 && results.length > 0;
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
       {/* Pinned search bar */}
       <div className="sticky top-0 z-40 bg-background/90 backdrop-blur-xl border-b border-border/50 px-4 py-3">
-        <div className="max-w-5xl mx-auto flex items-center gap-3">
-          <button
-            onClick={() => navigate(-1)}
-            className="shrink-0 p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
-            title="Go back (ESC)"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div className="flex-1 relative">
-            <form onSubmit={handleSubmit}>
-              <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground z-10" />
-              <Input
-                ref={inputRef}
-                type="text"
-                autoFocus
-                value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                  if (e.target.value.trim().length >= 2) setShowSuggestions(true);
-                }}
-                onFocus={() => {
-                  if (query.trim().length >= 2 && suggestions.length > 0) setShowSuggestions(true);
-                }}
-                placeholder="Search movies and TV shows..."
-                className="pl-11 pr-10 py-5 bg-secondary/50 border-border text-base"
-              />
-              {(loading || suggestionsLoading) && (
-                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 animate-spin text-muted-foreground" />
-              )}
-            </form>
+        <div className="max-w-5xl mx-auto">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate(-1)}
+              className="shrink-0 p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
+              title="Go back (ESC)"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div className="flex-1 relative">
+              <form onSubmit={handleSubmit}>
+                <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground z-10" />
+                <Input
+                  ref={inputRef}
+                  type="text"
+                  autoFocus
+                  value={query}
+                  onChange={(e) => {
+                    setQuery(e.target.value);
+                    if (e.target.value.trim().length >= 2) setShowSuggestions(true);
+                  }}
+                  onFocus={() => {
+                    if (query.trim().length >= 2 && suggestions.length > 0)
+                      setShowSuggestions(true);
+                  }}
+                  placeholder="Search movies, TV shows, or genres..."
+                  className="pl-11 pr-20 py-5 bg-secondary/50 border-border text-base"
+                />
+                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                  {(loading || suggestionsLoading) && (
+                    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                  )}
+                  <VoiceSearchButton onResult={handleVoiceResult} />
+                </div>
+              </form>
 
-            {/* Suggestions dropdown */}
-            {showSuggestions && query.trim().length >= 2 && (
-              <div
-                ref={suggestionsRef}
-                className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-xl shadow-xl overflow-hidden z-50"
+              {/* Suggestions dropdown */}
+              {showSuggestions && query.trim().length >= 2 && (
+                <div
+                  ref={suggestionsRef}
+                  className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-xl shadow-xl overflow-hidden z-50"
+                >
+                  {suggestionsLoading && suggestions.length === 0 && (
+                    <div className="flex items-center justify-center gap-2 p-4 text-muted-foreground text-sm">
+                      <Loader2 className="w-4 h-4 animate-spin" /> Searching…
+                    </div>
+                  )}
+                  {!suggestionsLoading && suggestions.length === 0 && (
+                    <div className="p-4 text-center text-muted-foreground text-sm">
+                      No results for "{query}"
+                    </div>
+                  )}
+                  {suggestions.map((item) => {
+                    const poster = getImageUrl(item.poster_path, "w92");
+                    const year = getYear(item);
+                    const title = getTitle(item);
+                    return (
+                      <button
+                        key={`${item.media_type}-${item.id}`}
+                        className="w-full flex items-center gap-3 p-3 hover:bg-secondary/50 transition-colors text-left"
+                        onClick={() => handleSuggestionClick(item)}
+                      >
+                        {poster ? (
+                          <img src={poster} alt={title} className="w-10 h-14 rounded object-cover" />
+                        ) : (
+                          <div className="w-10 h-14 rounded bg-secondary flex items-center justify-center">
+                            {item.media_type === "movie" ? (
+                              <Film className="w-5 h-5 text-muted-foreground" />
+                            ) : (
+                              <Tv2 className="w-5 h-5 text-muted-foreground" />
+                            )}
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-foreground truncate">{title}</p>
+                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 shrink-0">
+                              {item.media_type === "movie" ? "Movie" : "TV Series"}
+                            </Badge>
+                          </div>
+                          {year && <p className="text-sm text-muted-foreground">{year}</p>}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            {(urlQuery || query || filters.genre || filters.sort || filters.streamingOnly || filters.under2h) && (
+              <button
+                onClick={handleClear}
+                className="shrink-0 p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
               >
-                {suggestionsLoading && suggestions.length === 0 && (
-                  <div className="flex items-center justify-center gap-2 p-4 text-muted-foreground text-sm">
-                    <Loader2 className="w-4 h-4 animate-spin" /> Searching…
-                  </div>
-                )}
-                {!suggestionsLoading && suggestions.length === 0 && (
-                  <div className="p-4 text-center text-muted-foreground text-sm">
-                    No results for "{query}"
-                  </div>
-                )}
-                {suggestions.map((item) => {
-                  const poster = getImageUrl(item.poster_path, 'w92');
-                  const year = getYear(item);
-                  const title = getTitle(item);
-                  return (
-                    <button
-                      key={`${item.media_type}-${item.id}`}
-                      className="w-full flex items-center gap-3 p-3 hover:bg-secondary/50 transition-colors text-left"
-                      onClick={() => handleSuggestionClick(item)}
-                    >
-                      {poster ? (
-                        <img src={poster} alt={title} className="w-10 h-14 rounded object-cover" />
-                      ) : (
-                        <div className="w-10 h-14 rounded bg-secondary flex items-center justify-center">
-                          {item.media_type === 'movie' ? (
-                            <Film className="w-5 h-5 text-muted-foreground" />
-                          ) : (
-                            <Tv2 className="w-5 h-5 text-muted-foreground" />
-                          )}
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium text-foreground truncate">{title}</p>
-                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0 shrink-0">
-                            {item.media_type === 'movie' ? 'Movie' : 'TV Series'}
-                          </Badge>
-                        </div>
-                        {year && <p className="text-sm text-muted-foreground">{year}</p>}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
+                <X className="w-5 h-5" />
+              </button>
             )}
           </div>
-          {(urlQuery || query) && (
-            <button
-              onClick={handleClear}
-              className="shrink-0 p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          )}
+
+          {/* Filter bar */}
+          <div className="mt-2">
+            <SearchFilterBar filters={filters} onChange={handleFiltersChange} />
+          </div>
         </div>
       </div>
 
@@ -394,34 +511,46 @@ const Search = () => {
             </div>
           )}
 
+          {showEmptyFiltersHint && (
+            <div className="text-center py-20">
+              <SearchIcon className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+              <p className="text-muted-foreground text-lg">
+                No results with these filters
+              </p>
+              <p className="text-muted-foreground/70 text-sm mt-1">
+                Try turning off "Streaming only" or adjusting the genre filter
+              </p>
+            </div>
+          )}
+
           {hasSearched && !loading && !error && results.length === 0 && (
             <div className="text-center py-20">
               <SearchIcon className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
               <p className="text-muted-foreground text-lg">No results for "{urlQuery}"</p>
-              <p className="text-muted-foreground/70 text-sm mt-1">Try a different search term</p>
+              <p className="text-muted-foreground/70 text-sm mt-1">
+                Try a different search term
+              </p>
             </div>
           )}
 
-          {!loading && results.length > 0 && (
+          {!loading && filteredResults.length > 0 && (
             <>
               {genreMatch && (
                 <div className="flex items-center gap-2 mb-3">
                   <Tag className="w-4 h-4 text-primary" />
                   <span className="text-sm font-medium text-foreground">
-                    Genre results: {genreMatch.genreNames.join(' + ')}
+                    Genre results: {genreMatch.genreNames.join(" + ")}
                   </span>
                 </div>
               )}
               <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
                 <p className="text-muted-foreground text-sm">
-                  {filteredResults.length} of {results.length} result{results.length !== 1 ? "s" : ""} for "{urlQuery}"
+                  {filteredResults.length} of {results.length} result
+                  {results.length !== 1 ? "s" : ""}
+                  {urlQuery ? ` for "${urlQuery}"` : ""}
                 </p>
                 <div className="flex items-center gap-2">
-                  <Switch
-                    id="top5"
-                    checked={top5Only}
-                    onCheckedChange={setTop5Only}
-                  />
+                  <Switch id="top5" checked={top5Only} onCheckedChange={setTop5Only} />
                   <Label htmlFor="top5" className="text-sm text-muted-foreground cursor-pointer">
                     Show Top 5 Only
                   </Label>
@@ -432,12 +561,12 @@ const Search = () => {
                   <MediaCard
                     key={`${item.media_type}-${item.id}`}
                     id={item.id}
-                    title={item.title || item.name || ''}
+                    title={item.title || item.name || ""}
                     posterPath={item.poster_path}
                     voteAverage={item.vote_average}
-                    releaseDate={item.release_date || item.first_air_date || ''}
+                    releaseDate={item.release_date || item.first_air_date || ""}
                     overview={item.overview}
-                    mediaType={item.media_type as 'movie' | 'tv'}
+                    mediaType={item.media_type as "movie" | "tv"}
                   />
                 ))}
               </div>
@@ -445,19 +574,21 @@ const Search = () => {
           )}
 
           {!hasSearched && !loading && results.length === 0 && !error && (
-            <div className="text-center py-20">
-              <SearchIcon className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
-              <p className="text-muted-foreground text-lg">Start typing to search</p>
+            <div className="space-y-8 py-8">
+              <div className="text-center">
+                <h2 className="font-display text-2xl font-bold text-foreground mb-2">
+                  Find something to watch fast
+                </h2>
+                <p className="text-muted-foreground">Less scrolling, better picks.</p>
+              </div>
+              <div className="max-w-xl mx-auto">
+                <MoodChips onSelect={handleMoodSelect} />
+              </div>
             </div>
           )}
-          </div>
-        </div>
-
-        {/* Quick Filters */}
-        <div className="max-w-5xl mx-auto mt-3">
-          <QuickFilters active={activeFilters} onToggle={toggleFilter} />
         </div>
       </div>
+    </div>
   );
 };
 

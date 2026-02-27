@@ -4,7 +4,7 @@ import { submitSearch } from "@/lib/navigation";
 import { useQuery } from "@tanstack/react-query";
 import SearchAutocomplete from "@/components/SearchAutocomplete";
 import StreamingServiceCard from "@/components/StreamingServiceCard";
-import ContentCard from "@/components/ContentCard";
+
 import SavingsAnalyzer from "@/components/SavingsAnalyzer";
 import MediaRow from "@/components/MediaRow";
 import DecisionMode from "@/components/DecisionMode";
@@ -12,7 +12,7 @@ import Footer from "@/components/Footer";
 import RecentlyViewedRow from "@/components/RecentlyViewedRow";
 import { ArrowRight, Sparkles, Zap, Shield, PiggyBank } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { fetchMediaList, TMDBMovie, TMDBTvShow } from "@/lib/tmdb";
+import { fetchMediaList, tmdbFetch, TMDBMovie, TMDBTvShow, TMDBSearchResponse } from "@/lib/tmdb";
 
 const streamingServices = [
   { id: "netflix", name: "Netflix", logo: "N", color: "#E50914" },
@@ -104,6 +104,40 @@ const Index = () => {
     staleTime: 5 * 60 * 1000,
   });
 
+  // Genre discovery rows
+  const { data: topComedies, isLoading: loadingComedies } = useQuery({
+    queryKey: ['discover-comedy-home'],
+    queryFn: () => tmdbFetch<TMDBSearchResponse<TMDBMovie>>('/discover/movie', {
+      with_genres: '35',
+      sort_by: 'popularity.desc',
+      page: '1',
+      include_adult: 'false',
+    }),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: topAction, isLoading: loadingAction } = useQuery({
+    queryKey: ['discover-action-home'],
+    queryFn: () => tmdbFetch<TMDBSearchResponse<TMDBMovie>>('/discover/movie', {
+      with_genres: '28',
+      sort_by: 'popularity.desc',
+      page: '1',
+      include_adult: 'false',
+    }),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: topDrama, isLoading: loadingDrama } = useQuery({
+    queryKey: ['discover-drama-home'],
+    queryFn: () => tmdbFetch<TMDBSearchResponse<TMDBMovie>>('/discover/movie', {
+      with_genres: '18',
+      sort_by: 'popularity.desc',
+      page: '1',
+      include_adult: 'false',
+    }),
+    staleTime: 5 * 60 * 1000,
+  });
+
   return (
     <div className="min-h-screen">
 
@@ -132,7 +166,7 @@ const Index = () => {
 
             <div className="max-w-3xl mx-auto">
               <SearchAutocomplete 
-                placeholder="Search movies and TV shows..."
+                placeholder="Search movies, TV shows, or genres..."
                 onSearch={handleSearch}
               />
             </div>
@@ -233,34 +267,30 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Featured Content */}
-      <section className="py-16 px-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h2 className="font-display text-3xl font-bold text-foreground mb-2">
-                Available Now
-              </h2>
-              <p className="text-muted-foreground">
-                Popular on your connected services
-              </p>
-            </div>
-            <Button variant="ghost" className="text-primary" asChild>
-              <Link to="/movies">View all <ArrowRight className="w-4 h-4 ml-1" /></Link>
-            </Button>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 md:gap-6">
-            {featuredContent.map((content, index) => (
-              <div
-                key={content.title}
-                className="animate-fade-up"
-                style={{ animationDelay: `${index * 0.1}s` }}
-              >
-                <ContentCard {...content} />
-              </div>
-            ))}
-          </div>
+      {/* Genre Discovery Rows */}
+      <section className="py-8 px-6">
+        <div className="max-w-7xl mx-auto space-y-10">
+          <MediaRow
+            title="Top Comedies"
+            items={(topComedies?.results || []).slice(0, 10)}
+            mediaType="movie"
+            loading={loadingComedies}
+            viewAllLink="/search?genre=35"
+          />
+          <MediaRow
+            title="Top Action"
+            items={(topAction?.results || []).slice(0, 10)}
+            mediaType="movie"
+            loading={loadingAction}
+            viewAllLink="/search?genre=28"
+          />
+          <MediaRow
+            title="Top Drama"
+            items={(topDrama?.results || []).slice(0, 10)}
+            mediaType="movie"
+            loading={loadingDrama}
+            viewAllLink="/search?genre=18"
+          />
         </div>
       </section>
 
