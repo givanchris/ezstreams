@@ -14,6 +14,80 @@ export type Database = {
   }
   public: {
     Tables: {
+      list_items: {
+        Row: {
+          added_at: string
+          id: string
+          list_id: string
+          media_type: string
+          position: number
+          poster_path: string | null
+          title: string
+          tmdb_id: number
+        }
+        Insert: {
+          added_at?: string
+          id?: string
+          list_id: string
+          media_type: string
+          position?: number
+          poster_path?: string | null
+          title: string
+          tmdb_id: number
+        }
+        Update: {
+          added_at?: string
+          id?: string
+          list_id?: string
+          media_type?: string
+          position?: number
+          poster_path?: string | null
+          title?: string
+          tmdb_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "list_items_list_id_fkey"
+            columns: ["list_id"]
+            isOneToOne: false
+            referencedRelation: "user_lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          bio: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          updated_at: string
+          user_id: string
+          username: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+          username?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+          username?: string | null
+        }
+        Relationships: []
+      }
       reviews: {
         Row: {
           created_at: string
@@ -45,6 +119,39 @@ export type Database = {
           rating?: number
           review_text?: string | null
           tmdb_id?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_lists: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_public: boolean
+          slug: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_public?: boolean
+          slug: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_public?: boolean
+          slug?: string
+          title?: string
           updated_at?: string
           user_id?: string
         }

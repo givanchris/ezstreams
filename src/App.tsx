@@ -22,6 +22,9 @@ import NotFound from "./pages/NotFound";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import Terms from "./pages/Terms";
 import Contact from "./pages/Contact";
+import PublicProfile from "./pages/PublicProfile";
+import ListDetail from "./pages/ListDetail";
+import CreateList from "./pages/CreateList";
 
 const queryClient = new QueryClient();
 
@@ -112,6 +115,16 @@ const App = () => (
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/contact" element={<Contact />} />
+            <Route path="/user/:username" element={<PublicProfile />} />
+            <Route path="/list/:slug" element={<ListDetail />} />
+            <Route
+              path="/create-list"
+              element={
+                <ProtectedRoute>
+                  <CreateList />
+                </ProtectedRoute>
+              }
+            />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

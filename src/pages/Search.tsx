@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { Search as SearchIcon, ArrowLeft, Loader2, X, Film, Tv2, Tag } from "lucide-react";
+import { Search as SearchIcon, ArrowLeft, Loader2, X, Film, Tv2, Tag, Sparkles } from "lucide-react";
 import MediaCard from "@/components/MediaCard";
 import { tmdbFetch, TMDBSearchResponse, getImageUrl } from "@/lib/tmdb";
 import { rankSearchResults } from "@/lib/search-ranking";
@@ -13,6 +13,7 @@ import MoodChips, { type MoodPreset } from "@/components/MoodChips";
 import VoiceSearchButton from "@/components/VoiceSearchButton";
 import { supabase } from "@/integrations/supabase/client";
 import { loadGenres, detectGenre, type GenreMatch } from "@/lib/genre-detection";
+import { parseNaturalLanguageQuery, hasNLPFilters, type ParsedQuery } from "@/lib/nlp-query-parser";
 
 interface MultiSearchResult {
   id: number;
@@ -50,6 +51,7 @@ const Search = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [top5Only, setTop5Only] = useState(false);
   const [genreMatch, setGenreMatch] = useState<GenreMatch | null>(null);
+  const [nlpLabel, setNlpLabel] = useState<string | null>(null);
 
   const [filters, setFilters] = useState<SearchFilters>({
     genre: urlGenre,
@@ -125,21 +127,43 @@ const Search = () => {
       setHasSearched(true);
       setShowSuggestions(false);
       setGenreMatch(null);
+      setNlpLabel(null);
 
       try {
+        // Try NLP parsing first
+        let effectiveFilters = { ...currentFilters };
+        let effectiveQuery = trimmed;
+
+        if (trimmed) {
+          const parsed = parseNaturalLanguageQuery(trimmed);
+          if (hasNLPFilters(parsed)) {
+            setNlpLabel(parsed.label || null);
+            effectiveQuery = parsed.textQuery;
+            if (parsed.genre && !currentFilters.genre) {
+              effectiveFilters.genre = parsed.genre;
+            }
+            if (parsed.maxRuntime && parsed.maxRuntime <= 120) {
+              effectiveFilters.under2h = true;
+            }
+            if (parsed.sort && !currentFilters.sort) {
+              effectiveFilters.sort = parsed.sort;
+            }
+          }
+        }
+
         // Determine if this is a genre-based search
         let useGenreDiscover = false;
         let discoverGenreIds = "";
         let match: GenreMatch | null = null;
 
         // Filter bar genre takes priority
-        if (currentFilters.genre) {
+        if (effectiveFilters.genre) {
           useGenreDiscover = true;
-          discoverGenreIds = currentFilters.genre;
-        } else if (trimmed) {
+          discoverGenreIds = effectiveFilters.genre;
+        } else if (effectiveQuery) {
           // Try genre detection from query
           const genres = await loadGenres();
-          match = detectGenre(trimmed, genres.movie, genres.tv);
+          match = detectGenre(effectiveQuery, genres.movie, genres.tv);
           if (match && (match.movieGenreIds.length > 0 || match.tvGenreIds.length > 0)) {
             useGenreDiscover = true;
             discoverGenreIds = [...match.movieGenreIds, ...match.tvGenreIds]
@@ -149,9 +173,9 @@ const Search = () => {
           }
         }
 
-        if (useGenreDiscover || (!trimmed && (currentFilters.streamingOnly || currentFilters.sort))) {
+        if (useGenreDiscover || (!effectiveQuery && (effectiveFilters.streamingOnly || effectiveFilters.sort))) {
           // Genre / discover mode
-          const movieParams = buildDiscoverParams(discoverGenreIds);
+          const movieParams = buildDiscoverParams(discoverGenreIds, effectiveFilters.sort || undefined);
           const tvParams = buildDiscoverParams(discoverGenreIds, movieParams.sort_by);
 
           const [movieData, tvData] = await Promise.all([
@@ -172,17 +196,18 @@ const Search = () => {
           const combined = [...movieData.results, ...tvData.results];
           combined.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
           setResults(combined);
-        } else if (trimmed) {
+        } else if (effectiveQuery || trimmed) {
           // Normal title search
+          const searchText = effectiveQuery || trimmed;
           const data = await tmdbFetch<TMDBSearchResponse<MultiSearchResult>>(
             "/search/multi",
-            { query: trimmed, page: "1", include_adult: "false" }
+            { query: searchText, page: "1", include_adult: "false" }
           );
           const filtered = data.results.filter(
             (r): r is MultiSearchResult & { media_type: "movie" | "tv" } =>
               r.media_type === "movie" || r.media_type === "tv"
           );
-          setResults(rankSearchResults(filtered, trimmed) as MultiSearchResult[]);
+          setResults(rankSearchResults(filtered, searchText) as MultiSearchResult[]);
         } else {
           setResults([]);
         }
@@ -312,6 +337,7 @@ const Search = () => {
     setHasSearched(false);
     setShowSuggestions(false);
     setGenreMatch(null);
+    setNlpLabel(null);
   };
 
   const handleSuggestionClick = (item: MultiSearchResult) => {
@@ -535,12 +561,24 @@ const Search = () => {
 
           {!loading && filteredResults.length > 0 && (
             <>
-              {genreMatch && (
-                <div className="flex items-center gap-2 mb-3">
-                  <Tag className="w-4 h-4 text-primary" />
-                  <span className="text-sm font-medium text-foreground">
-                    Genre results: {genreMatch.genreNames.join(" + ")}
-                  </span>
+              {(genreMatch || nlpLabel) && (
+                <div className="flex items-center gap-2 mb-3 flex-wrap">
+                  {nlpLabel && (
+                    <div className="flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-primary" />
+                      <span className="text-sm font-medium text-foreground">
+                        Results for: {nlpLabel}
+                      </span>
+                    </div>
+                  )}
+                  {genreMatch && !nlpLabel && (
+                    <div className="flex items-center gap-1.5">
+                      <Tag className="w-4 h-4 text-primary" />
+                      <span className="text-sm font-medium text-foreground">
+                        Genre results: {genreMatch.genreNames.join(" + ")}
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
               <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
