@@ -1,19 +1,74 @@
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { User, LogOut, Home, Mail, Calendar } from "lucide-react";
+import { User, LogOut, Home, Mail, Calendar, List, Plus, Edit2, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "@/hooks/use-toast";
 import Footer from "@/components/Footer";
 
 const Profile = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [editingUsername, setEditingUsername] = useState(false);
+  const [newUsername, setNewUsername] = useState("");
+
+  const { data: profile } = useQuery({
+    queryKey: ["my-profile", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("user_id", user!.id)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.id,
+  });
+
+  const { data: myLists } = useQuery({
+    queryKey: ["my-lists", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("user_lists")
+        .select("*")
+        .eq("user_id", user!.id)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.id,
+  });
+
+  useEffect(() => {
+    if (profile?.username) setNewUsername(profile.username);
+  }, [profile?.username]);
 
   const handleSignOut = async () => {
     await signOut();
     navigate("/");
   };
 
-  const createdAt = user?.created_at 
+  const saveUsername = async () => {
+    if (!user || !newUsername.trim()) return;
+    const { error } = await supabase
+      .from("profiles")
+      .update({ username: newUsername.trim().toLowerCase() })
+      .eq("user_id", user.id);
+    if (error) {
+      toast({ title: "Username taken or invalid", variant: "destructive" });
+    } else {
+      toast({ title: "Username updated!" });
+      queryClient.invalidateQueries({ queryKey: ["my-profile"] });
+      setEditingUsername(false);
+    }
+  };
+
+  const createdAt = user?.created_at
     ? new Date(user.created_at).toLocaleDateString("en-US", {
         year: "numeric",
         month: "long",
@@ -34,6 +89,11 @@ const Profile = () => {
           <h1 className="font-display text-4xl md:text-5xl font-bold text-foreground mb-4">
             <span className="text-gradient">Profile</span>
           </h1>
+          {profile?.username && (
+            <Link to={`/user/${profile.username}`} className="text-sm text-primary hover:underline">
+              View public profile →
+            </Link>
+          )}
         </div>
 
         {/* Profile info card */}
@@ -41,8 +101,36 @@ const Profile = () => {
           <h2 className="font-display text-xl font-semibold text-foreground mb-6">
             Account Information
           </h2>
-          
+
           <div className="space-y-4">
+            {/* Username */}
+            <div className="flex items-center gap-4 p-4 rounded-xl bg-secondary/30">
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <User className="w-5 h-5 text-primary" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm text-muted-foreground">Username</p>
+                {editingUsername ? (
+                  <div className="flex items-center gap-2 mt-1">
+                    <Input
+                      value={newUsername}
+                      onChange={(e) => setNewUsername(e.target.value)}
+                      className="h-8 text-sm"
+                    />
+                    <button onClick={saveUsername} className="text-primary"><Check className="w-4 h-4" /></button>
+                    <button onClick={() => setEditingUsername(false)} className="text-muted-foreground"><X className="w-4 h-4" /></button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-foreground">{profile?.username || "Not set"}</p>
+                    <button onClick={() => setEditingUsername(true)} className="text-muted-foreground hover:text-foreground">
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
             <div className="flex items-center gap-4 p-4 rounded-xl bg-secondary/30">
               <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
                 <Mail className="w-5 h-5 text-primary" />
@@ -67,6 +155,38 @@ const Profile = () => {
           </div>
         </div>
 
+        {/* My Lists */}
+        <div className="glass-card rounded-2xl p-8 mt-6 animate-fade-up" style={{ animationDelay: "0.15s" }}>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-display text-xl font-semibold text-foreground flex items-center gap-2">
+              <List className="w-5 h-5" /> My Lists
+            </h2>
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/create-list">
+                <Plus className="w-4 h-4 mr-1" /> New List
+              </Link>
+            </Button>
+          </div>
+          {!myLists || myLists.length === 0 ? (
+            <p className="text-muted-foreground text-sm">No lists yet. Create your first list!</p>
+          ) : (
+            <div className="space-y-2">
+              {myLists.map((list) => (
+                <Link
+                  key={list.id}
+                  to={`/list/${list.slug}`}
+                  className="block p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors"
+                >
+                  <p className="font-medium text-foreground text-sm">{list.title}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {list.is_public ? "Public" : "Private"} · {new Date(list.created_at).toLocaleDateString()}
+                  </p>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Actions */}
         <div className="flex flex-col sm:flex-row gap-4 mt-8 animate-fade-up" style={{ animationDelay: "0.2s" }}>
           <Button variant="outline" size="lg" className="flex-1" asChild>
@@ -75,9 +195,9 @@ const Profile = () => {
               Back to Home
             </Link>
           </Button>
-          <Button 
-            variant="destructive" 
-            size="lg" 
+          <Button
+            variant="destructive"
+            size="lg"
             className="flex-1"
             onClick={handleSignOut}
           >

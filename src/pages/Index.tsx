@@ -10,6 +10,7 @@ import DecisionMode from "@/components/DecisionMode";
 import Footer from "@/components/Footer";
 import RecentlyViewedRow from "@/components/RecentlyViewedRow";
 import { ArrowRight, Sparkles, Zap, Shield, PiggyBank } from "lucide-react";
+import PopularLists from "@/components/PopularLists";
 import MoodChips, { MoodPreset } from "@/components/MoodChips";
 import SearchFilterBar, { SearchFilters, DEFAULT_FILTERS } from "@/components/SearchFilterBar";
 import { Button } from "@/components/ui/button";
@@ -320,6 +321,13 @@ const Index = () => {
             loading={loadingDrama}
             viewAllLink="/search?genre=18"
           />
+        </div>
+      </section>
+
+      {/* Popular Lists */}
+      <section className="py-8 px-6">
+        <div className="max-w-7xl mx-auto">
+          <PopularLists />
         </div>
       </section>
 
