@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { TrendingDown, TrendingUp, AlertTriangle, Check, RotateCcw, Loader2, BarChart3, Bug, ChevronDown, ChevronUp } from "lucide-react";
+import { TrendingDown, TrendingUp, AlertTriangle, Check, RotateCcw, Loader2, BarChart3, Bug, ChevronDown, ChevronUp, Lock } from "lucide-react";
 import { Button } from "./ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useProviderTracking, getLastTrackResult } from "@/hooks/useProviderTracking";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 import { normalizeProviderCounts } from "@/lib/provider-normalization";
 import SavingsUpgradePrompt from "./SavingsUpgradePrompt";
+import UpgradeModal from "./UpgradeModal";
 
 const REGIONS = [
   { code: "US", name: "United States" },
@@ -60,12 +62,14 @@ const DEFAULT_SHOW = 5;
 
 const SavingsAnalyzer = () => {
   const { user } = useAuth();
+  const { subscribed } = useSubscription();
   const [searchParams] = useSearchParams();
   const debugMode = searchParams.get("debug") === "1";
   const [region, setRegion] = useState("US");
   const { stats, resetStats } = useProviderTracking(region);
   const [resetting, setResetting] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
 
   const handleReset = async () => {
     setResetting(true);
@@ -82,6 +86,11 @@ const SavingsAnalyzer = () => {
 
   const visibleProviders = showAll ? normalizedProviders : normalizedProviders.slice(0, DEFAULT_SHOW);
   const hasMore = normalizedProviders.length > DEFAULT_SHOW;
+
+  // Calculate estimated savings for preview
+  const estimatedSavings = normalizedProviders.length > 1
+    ? Math.round((normalizedProviders.slice(1).reduce((s, p) => s + p.count, 0) / Math.max(stats.totalTitles, 1)) * 15)
+    : 0;
 
   if (!user) {
     return (
@@ -105,6 +114,8 @@ const SavingsAnalyzer = () => {
 
   return (
     <div className="glass-card rounded-3xl p-8">
+      <UpgradeModal open={upgradeOpen} onOpenChange={setUpgradeOpen} />
+
       {/* Debug */}
       {debugMode && (
         <div className="mb-6 p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-sm font-mono space-y-1">
@@ -112,6 +123,7 @@ const SavingsAnalyzer = () => {
           <p className="text-muted-foreground">user_id: <span className="text-foreground">{user.id}</span></p>
           <p className="text-muted-foreground">regionISO: <span className="text-foreground">{region}</span></p>
           <p className="text-muted-foreground">total_titles: <span className="text-foreground">{stats.totalTitles}</span></p>
+          <p className="text-muted-foreground">subscribed: <span className="text-foreground">{String(subscribed)}</span></p>
           <p className="text-muted-foreground">last trackTitle: <span className="text-foreground">{lastResult ? JSON.stringify(lastResult) : "none"}</span></p>
         </div>
       )}
@@ -144,68 +156,127 @@ const SavingsAnalyzer = () => {
         </div>
       ) : (
         <div className="space-y-4">
-          {visibleProviders.map((provider) => {
-            const rec = getRecommendation(provider.percent);
-            const styles = recStyles[rec];
-            const Icon = styles.icon;
-            const color = getProviderColor(provider.name);
+          {/* --- FREE USER PREVIEW --- */}
+          {!subscribed && (
+            <>
+              {/* Savings teaser */}
+              {estimatedSavings > 0 && (
+                <div className="p-6 rounded-2xl bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/30 text-center">
+                  <p className="text-3xl font-bold text-foreground mb-1">
+                    You could save <span className="text-primary">${estimatedSavings}</span>/month
+                  </p>
+                  <p className="text-sm text-muted-foreground">on streaming services based on your viewing habits</p>
+                </div>
+              )}
 
-            return (
-              <div key={provider.name} className={`relative p-5 rounded-2xl border transition-all duration-300 ${styles.bg} ${styles.border}`}>
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl flex items-center justify-center text-sm font-bold shrink-0 text-white" style={{ backgroundColor: color }}>
-                    {provider.name.charAt(0)}
+              {/* Show top provider only (blurred rest) */}
+              {normalizedProviders.length > 0 && (
+                <ProviderRow provider={normalizedProviders[0]} totalTitles={stats.totalTitles} />
+              )}
+
+              {/* Locked / blurred section */}
+              <div className="relative">
+                <div className="space-y-4 blur-sm pointer-events-none select-none" aria-hidden="true">
+                  {normalizedProviders.slice(1, 4).map((provider) => (
+                    <ProviderRow key={provider.name} provider={provider} totalTitles={stats.totalTitles} />
+                  ))}
+                </div>
+
+                {/* Lock overlay */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-card/60 backdrop-blur-[2px] rounded-2xl">
+                  <div className="w-14 h-14 rounded-full bg-primary/20 flex items-center justify-center mb-4">
+                    <Lock className="w-7 h-7 text-primary" />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h4 className="font-display font-semibold text-foreground">{provider.name}</h4>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
-                        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${provider.percent}%`, backgroundColor: color }} />
-                      </div>
-                      <span className="text-sm font-medium text-foreground w-12 text-right">{provider.percent}%</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-1">{provider.count} of {stats.totalTitles} explored titles available</p>
-                  </div>
-                  <div className={`flex items-center gap-2 px-4 py-2 rounded-full ${styles.bg} border ${styles.border}`}>
-                    <Icon className={`w-4 h-4 ${styles.text}`} />
-                    <span className={`text-sm font-semibold ${styles.text}`}>{styles.label}</span>
-                  </div>
+                  <h4 className="font-display font-semibold text-foreground text-lg mb-2">
+                    Unlock the full analysis
+                  </h4>
+                  <ul className="text-sm text-muted-foreground space-y-1 mb-4 text-left">
+                    <li>• Which subscriptions you can cancel</li>
+                    <li>• Overlapping streaming services</li>
+                    <li>• Optimized streaming plan</li>
+                  </ul>
+                  <Button variant="hero" size="default" onClick={() => setUpgradeOpen(true)}>
+                    <Lock className="w-4 h-4 mr-1" /> View Full Analysis
+                  </Button>
                 </div>
               </div>
-            );
-          })}
-
-          {hasMore && (
-            <button
-              onClick={() => setShowAll(!showAll)}
-              className="w-full py-3 text-sm text-muted-foreground hover:text-foreground flex items-center justify-center gap-1 transition-colors"
-            >
-              {showAll ? <><ChevronUp className="w-4 h-4" /> Show less</> : <><ChevronDown className="w-4 h-4" /> Show all {normalizedProviders.length} providers</>}
-            </button>
+            </>
           )}
 
-          {normalizedProviders.length > 0 && (
-            <div className="mt-6 p-6 rounded-2xl bg-gradient-to-r from-accent/10 to-primary/10 border border-accent/30">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-accent/20 flex items-center justify-center">
-                  <TrendingUp className="w-6 h-6 text-accent" />
+          {/* --- PRO USER FULL VIEW --- */}
+          {subscribed && (
+            <>
+              {visibleProviders.map((provider) => (
+                <ProviderRow key={provider.name} provider={provider} totalTitles={stats.totalTitles} />
+              ))}
+
+              {hasMore && (
+                <button
+                  onClick={() => setShowAll(!showAll)}
+                  className="w-full py-3 text-sm text-muted-foreground hover:text-foreground flex items-center justify-center gap-1 transition-colors"
+                >
+                  {showAll ? <><ChevronUp className="w-4 h-4" /> Show less</> : <><ChevronDown className="w-4 h-4" /> Show all {normalizedProviders.length} providers</>}
+                </button>
+              )}
+
+              {normalizedProviders.length > 0 && (
+                <div className="mt-6 p-6 rounded-2xl bg-gradient-to-r from-accent/10 to-primary/10 border border-accent/30">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-full bg-accent/20 flex items-center justify-center">
+                      <TrendingUp className="w-6 h-6 text-accent" />
+                    </div>
+                    <div>
+                      <p className="font-display font-semibold text-foreground">Top pick: {normalizedProviders[0].name}</p>
+                      <p className="text-sm text-muted-foreground">Covers {normalizedProviders[0].percent}% of the titles you've explored</p>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-display font-semibold text-foreground">Top pick: {normalizedProviders[0].name}</p>
-                  <p className="text-sm text-muted-foreground">Covers {normalizedProviders[0].percent}% of the titles you've explored</p>
-                </div>
-              </div>
-            </div>
+              )}
+            </>
           )}
 
-          {/* Contextual upgrade prompt */}
-          <SavingsUpgradePrompt potentialSavings={normalizedProviders.length > 1 ? Math.round((normalizedProviders.slice(1).reduce((s, p) => s + p.count, 0) / stats.totalTitles) * 15) : undefined} />
+          {/* Contextual upgrade prompt (only for free users) */}
+          {!subscribed && (
+            <SavingsUpgradePrompt potentialSavings={estimatedSavings > 0 ? estimatedSavings : undefined} />
+          )}
         </div>
       )}
     </div>
   );
 };
+
+/** Single provider row — extracted for reuse */
+function ProviderRow({ provider, totalTitles }: { provider: { name: string; count: number; percent: number }; totalTitles: number }) {
+  const rec = getRecommendation(provider.percent);
+  const styles = recStyles[rec];
+  const Icon = styles.icon;
+  const color = getProviderColor(provider.name);
+
+  return (
+    <div className={`relative p-5 rounded-2xl border transition-all duration-300 ${styles.bg} ${styles.border}`}>
+      <div className="flex items-center gap-4">
+        <div className="w-12 h-12 rounded-xl flex items-center justify-center text-sm font-bold shrink-0 text-white" style={{ backgroundColor: color }}>
+          {provider.name.charAt(0)}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-3 mb-2">
+            <h4 className="font-display font-semibold text-foreground">{provider.name}</h4>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
+              <div className="h-full rounded-full transition-all duration-500" style={{ width: `${provider.percent}%`, backgroundColor: color }} />
+            </div>
+            <span className="text-sm font-medium text-foreground w-12 text-right">{provider.percent}%</span>
+          </div>
+          <p className="text-sm text-muted-foreground mt-1">{provider.count} of {totalTitles} explored titles available</p>
+        </div>
+        <div className={`flex items-center gap-2 px-4 py-2 rounded-full ${styles.bg} border ${styles.border}`}>
+          <Icon className={`w-4 h-4 ${styles.text}`} />
+          <span className={`text-sm font-semibold ${styles.text}`}>{styles.label}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default SavingsAnalyzer;
