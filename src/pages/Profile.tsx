@@ -1,20 +1,23 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { User, LogOut, Home, Mail, Calendar, List, Plus, Edit2, Check, X } from "lucide-react";
+import { User, LogOut, Home, Mail, Calendar, List, Plus, Edit2, Check, X, Crown, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import Footer from "@/components/Footer";
 
 const Profile = () => {
-  const { user, signOut } = useAuth();
+  const { user, session, signOut } = useAuth();
+  const { subscribed, subscriptionEnd, priceAmount, loading: subLoading, checkSubscription } = useSubscription();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [editingUsername, setEditingUsername] = useState(false);
   const [newUsername, setNewUsername] = useState("");
+  const [portalLoading, setPortalLoading] = useState(false);
 
   const { data: profile } = useQuery({
     queryKey: ["my-profile", user?.id],
@@ -51,6 +54,21 @@ const Profile = () => {
   const handleSignOut = async () => {
     await signOut();
     navigate("/");
+  };
+
+  const handleManageSubscription = async () => {
+    setPortalLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("customer-portal", {
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      });
+      if (error) throw error;
+      if (data?.url) window.open(data.url, "_blank");
+    } catch (err: any) {
+      toast({ title: "Could not open portal", description: err.message, variant: "destructive" });
+    } finally {
+      setPortalLoading(false);
+    }
   };
 
   const saveUsername = async () => {
@@ -153,6 +171,39 @@ const Profile = () => {
               </div>
             )}
           </div>
+        </div>
+
+        {/* Subscription */}
+        <div className="glass-card rounded-2xl p-8 mt-6 animate-fade-up" style={{ animationDelay: "0.12s" }}>
+          <h2 className="font-display text-xl font-semibold text-foreground mb-4 flex items-center gap-2">
+            <Crown className="w-5 h-5" /> EZstream Pro
+          </h2>
+          {subscribed ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 p-4 rounded-xl bg-accent/10 border border-accent/30">
+                <Check className="w-5 h-5 text-accent" />
+                <div>
+                  <p className="font-medium text-foreground">Active — ${priceAmount ? (priceAmount / 100).toFixed(0) : "?"}/month</p>
+                  {subscriptionEnd && (
+                    <p className="text-sm text-muted-foreground">
+                      Next billing: {new Date(subscriptionEnd).toLocaleDateString()}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <Button variant="outline" size="sm" onClick={handleManageSubscription} disabled={portalLoading}>
+                {portalLoading ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+                Manage Subscription
+              </Button>
+            </div>
+          ) : (
+            <div>
+              <p className="text-muted-foreground text-sm mb-4">Unlock unlimited features by supporting EZstream.</p>
+              <Button variant="hero" size="sm" asChild>
+                <Link to="/upgrade">Upgrade to Pro</Link>
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* My Lists */}

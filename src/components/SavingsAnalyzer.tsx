@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useProviderTracking, getLastTrackResult } from "@/hooks/useProviderTracking";
 import { useAuth } from "@/contexts/AuthContext";
 import { normalizeProviderCounts } from "@/lib/provider-normalization";
+import SavingsUpgradePrompt from "./SavingsUpgradePrompt";
 
 const REGIONS = [
   { code: "US", name: "United States" },
@@ -198,6 +199,9 @@ const SavingsAnalyzer = () => {
               </div>
             </div>
           )}
+
+          {/* Contextual upgrade prompt */}
+          <SavingsUpgradePrompt potentialSavings={normalizedProviders.length > 1 ? Math.round((normalizedProviders.slice(1).reduce((s, p) => s + p.count, 0) / stats.totalTitles) * 15) : undefined} />
         </div>
       )}
     </div>
