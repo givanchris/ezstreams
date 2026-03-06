@@ -11,11 +11,13 @@ import { toast } from "@/hooks/use-toast";
 import Footer from "@/components/Footer";
 
 const Profile = () => {
-  const { user, signOut } = useAuth();
+  const { user, session, signOut } = useAuth();
+  const { subscribed, subscriptionEnd, priceAmount, loading: subLoading, checkSubscription } = useSubscription();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [editingUsername, setEditingUsername] = useState(false);
   const [newUsername, setNewUsername] = useState("");
+  const [portalLoading, setPortalLoading] = useState(false);
 
   const { data: profile } = useQuery({
     queryKey: ["my-profile", user?.id],
