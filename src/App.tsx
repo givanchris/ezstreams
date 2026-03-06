@@ -37,6 +37,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
+          <SubscriptionProvider>
           <MainNav />
           <Routes>
             <Route path="/" element={<Index />} />
