@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useProviderTracking, getLastTrackResult } from "@/hooks/useProviderTracking";
 import { useAuth } from "@/contexts/AuthContext";
 import { normalizeProviderCounts } from "@/lib/provider-normalization";
+import SavingsUpgradePrompt from "./SavingsUpgradePrompt";
 
 const REGIONS = [
   { code: "US", name: "United States" },
