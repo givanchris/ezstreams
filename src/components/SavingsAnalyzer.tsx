@@ -199,6 +199,9 @@ const SavingsAnalyzer = () => {
               </div>
             </div>
           )}
+
+          {/* Contextual upgrade prompt */}
+          <SavingsUpgradePrompt potentialSavings={normalizedProviders.length > 1 ? Math.round((normalizedProviders.slice(1).reduce((s, p) => s + p.count, 0) / stats.totalTitles) * 15) : undefined} />
         </div>
       )}
     </div>
