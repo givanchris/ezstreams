@@ -235,10 +235,6 @@ const SavingsAnalyzer = () => {
             </>
           )}
 
-          {/* Contextual upgrade prompt (only for free users) */}
-          {!subscribed && (
-            <SavingsUpgradePrompt potentialSavings={estimatedSavings > 0 ? estimatedSavings : undefined} />
-          )}
         </div>
       )}
     </div>
