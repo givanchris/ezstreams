@@ -7,7 +7,7 @@ import { useProviderTracking, getLastTrackResult } from "@/hooks/useProviderTrac
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { normalizeProviderCounts } from "@/lib/provider-normalization";
-import SavingsUpgradePrompt from "./SavingsUpgradePrompt";
+
 import UpgradeModal from "./UpgradeModal";
 
 const REGIONS = [
