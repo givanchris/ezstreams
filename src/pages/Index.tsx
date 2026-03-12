@@ -272,6 +272,13 @@ const Index = () => {
         </div>
       </section>
 
+      {/* Trending On Your Services */}
+      <section className="py-8 px-6">
+        <div className="max-w-7xl mx-auto">
+          <TrendingOnYourServices />
+        </div>
+      </section>
+
       {/* Trending Movies */}
       <section className="py-8 px-6">
         <div className="max-w-7xl mx-auto">
