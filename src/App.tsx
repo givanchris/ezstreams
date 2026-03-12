@@ -27,6 +27,7 @@ import Contact from "./pages/Contact";
 import PublicProfile from "./pages/PublicProfile";
 import ListDetail from "./pages/ListDetail";
 import CreateList from "./pages/CreateList";
+import GenrePage from "./pages/GenrePage";
 
 const queryClient = new QueryClient();
 
