@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import MediaCard from '@/components/MediaCard';
+import HoverPreview from '@/components/HoverPreview';
 import { TMDBMovie, TMDBTvShow } from '@/lib/tmdb';
 
 type MediaItem = TMDBMovie | TMDBTvShow;
