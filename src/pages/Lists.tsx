@@ -2,13 +2,17 @@ import { Link } from "react-router-dom";
 import { Heart, Search, ArrowRight, Bookmark, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import MediaCard from "@/components/MediaCard";
+import HoverPreview from "@/components/HoverPreview";
+import WatchlistCoverage from "@/components/WatchlistCoverage";
 import { useWatchlist } from "@/hooks/useWatchlist";
+import { useWatchlistCoverage } from "@/hooks/useWatchlistCoverage";
 import { useAuth } from "@/contexts/AuthContext";
 import Footer from "@/components/Footer";
 
 const Lists = () => {
   const { user } = useAuth();
   const { items, loading, removeFromWatchlist } = useWatchlist();
+  const coverage = useWatchlistCoverage(items);
 
   const handleRemove = async (mediaId: string, mediaType: 'movie' | 'tv') => {
     await removeFromWatchlist(parseInt(mediaId), mediaType);
