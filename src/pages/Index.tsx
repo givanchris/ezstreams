@@ -6,6 +6,7 @@ import StreamingServiceCard from "@/components/StreamingServiceCard";
 
 import SavingsAnalyzer from "@/components/SavingsAnalyzer";
 import MediaRow from "@/components/MediaRow";
+import TrendingOnYourServices from "@/components/TrendingOnYourServices";
 import DecisionMode from "@/components/DecisionMode";
 import Footer from "@/components/Footer";
 import RecentlyViewedRow from "@/components/RecentlyViewedRow";
