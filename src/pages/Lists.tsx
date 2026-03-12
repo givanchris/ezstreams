@@ -2,13 +2,17 @@ import { Link } from "react-router-dom";
 import { Heart, Search, ArrowRight, Bookmark, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import MediaCard from "@/components/MediaCard";
+import HoverPreview from "@/components/HoverPreview";
+import WatchlistCoverage from "@/components/WatchlistCoverage";
 import { useWatchlist } from "@/hooks/useWatchlist";
+import { useWatchlistCoverage } from "@/hooks/useWatchlistCoverage";
 import { useAuth } from "@/contexts/AuthContext";
 import Footer from "@/components/Footer";
 
 const Lists = () => {
   const { user } = useAuth();
   const { items, loading, removeFromWatchlist } = useWatchlist();
+  const coverage = useWatchlistCoverage(items);
 
   const handleRemove = async (mediaId: string, mediaType: 'movie' | 'tv') => {
     await removeFromWatchlist(parseInt(mediaId), mediaType);
@@ -86,21 +90,26 @@ const Lists = () => {
         ) : (
           // Watchlist grid
           <div className="animate-fade-up" style={{ animationDelay: "0.1s" }}>
+            {/* Coverage Score */}
+            <WatchlistCoverage coverage={coverage} totalItems={items.length} />
+
             <p className="text-muted-foreground mb-6">
               {items.length} title{items.length !== 1 ? 's' : ''} in your list
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {items.map((item) => (
                 <div key={item.id} className="group relative">
-                  <MediaCard
-                    id={parseInt(item.media_id)}
-                    title={item.title}
-                    posterPath={item.poster_path}
-                    voteAverage={0}
-                    releaseDate=""
-                    overview=""
-                    mediaType={item.media_type}
-                  />
+                  <HoverPreview id={parseInt(item.media_id)} mediaType={item.media_type}>
+                    <MediaCard
+                      id={parseInt(item.media_id)}
+                      title={item.title}
+                      posterPath={item.poster_path}
+                      voteAverage={0}
+                      releaseDate=""
+                      overview=""
+                      mediaType={item.media_type}
+                    />
+                  </HoverPreview>
                   <button
                     onClick={() => handleRemove(item.media_id, item.media_type)}
                     className="absolute top-2 right-2 p-2 rounded-full bg-black/70 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive"

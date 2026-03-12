@@ -6,6 +6,7 @@ import StreamingServiceCard from "@/components/StreamingServiceCard";
 
 import SavingsAnalyzer from "@/components/SavingsAnalyzer";
 import MediaRow from "@/components/MediaRow";
+import TrendingOnYourServices from "@/components/TrendingOnYourServices";
 import DecisionMode from "@/components/DecisionMode";
 import Footer from "@/components/Footer";
 import RecentlyViewedRow from "@/components/RecentlyViewedRow";
@@ -268,6 +269,13 @@ const Index = () => {
       <section className="py-8 px-6">
         <div className="max-w-7xl mx-auto">
           <RecentlyViewedRow />
+        </div>
+      </section>
+
+      {/* Trending On Your Services */}
+      <section className="py-8 px-6">
+        <div className="max-w-7xl mx-auto">
+          <TrendingOnYourServices />
         </div>
       </section>
 

@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import MediaCard from '@/components/MediaCard';
+import HoverPreview from '@/components/HoverPreview';
 import { TMDBMovie, TMDBTvShow } from '@/lib/tmdb';
 
 type MediaItem = TMDBMovie | TMDBTvShow;
@@ -91,15 +92,17 @@ const MediaRow = ({ title, items, mediaType, loading = false, viewAllLink }: Med
           const isMovie = 'title' in item;
           return (
             <div key={item.id} className="flex-shrink-0 w-36 md:w-44">
-              <MediaCard
-                id={item.id}
-                title={isMovie ? (item as TMDBMovie).title : (item as TMDBTvShow).name}
-                posterPath={item.poster_path}
-                voteAverage={item.vote_average}
-                releaseDate={isMovie ? (item as TMDBMovie).release_date : (item as TMDBTvShow).first_air_date}
-                overview={item.overview}
-                mediaType={mediaType}
-              />
+              <HoverPreview id={item.id} mediaType={mediaType}>
+                <MediaCard
+                  id={item.id}
+                  title={isMovie ? (item as TMDBMovie).title : (item as TMDBTvShow).name}
+                  posterPath={item.poster_path}
+                  voteAverage={item.vote_average}
+                  releaseDate={isMovie ? (item as TMDBMovie).release_date : (item as TMDBTvShow).first_air_date}
+                  overview={item.overview}
+                  mediaType={mediaType}
+                />
+              </HoverPreview>
             </div>
           );
         })}
