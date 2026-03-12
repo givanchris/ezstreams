@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
+import SEOHead from "@/components/SEOHead";
 import { ArrowLeft, Star, Calendar, ExternalLink, Tv2, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -146,8 +147,32 @@ const TvDetails = () => {
     );
   }
 
+  const seoTitle = `Where to Watch ${show.name}${year ? ` (${year})` : ""} (Streaming Guide) | EZstream`;
+  const seoDesc = `Find where ${show.name} is streaming across Netflix, Prime Video, Hulu and more. Compare streaming options instantly with EZstream.`;
+  const seoImage = getImageUrl(show.poster_path, "w500");
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "TVSeries",
+    name: show.name,
+    image: seoImage || undefined,
+    datePublished: show.first_air_date || undefined,
+    genre: show.genres?.map((g) => g.name),
+    description: show.overview,
+    ...(show.number_of_seasons && { numberOfSeasons: show.number_of_seasons }),
+    ...(show.number_of_episodes && { numberOfEpisodes: show.number_of_episodes }),
+    ...(show.vote_average > 0 && {
+      aggregateRating: {
+        "@type": "AggregateRating",
+        ratingValue: show.vote_average.toFixed(1),
+        bestRating: "10",
+        ratingCount: show.vote_count,
+      },
+    }),
+  };
+
   return (
     <div className="min-h-screen">
+      <SEOHead title={seoTitle} description={seoDesc} canonicalPath={`/tv/${id}`} image={seoImage} jsonLd={jsonLd} />
       {/* Backdrop */}
       {backdropUrl && (
         <div className="absolute inset-0 h-[50vh] overflow-hidden">

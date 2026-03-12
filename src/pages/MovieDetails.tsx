@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
+import SEOHead from "@/components/SEOHead";
 import { ArrowLeft, Star, Clock, Calendar, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -156,8 +157,30 @@ const MovieDetails = () => {
     );
   }
 
+  const seoTitle = `Where to Watch ${movie.title}${year ? ` (${year})` : ""} (Streaming Guide) | EZstream`;
+  const seoDesc = `Find where ${movie.title} is streaming across Netflix, Prime Video, Hulu and more. Compare streaming options instantly with EZstream.`;
+  const seoImage = getImageUrl(movie.poster_path, "w500");
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Movie",
+    name: movie.title,
+    image: seoImage || undefined,
+    datePublished: movie.release_date || undefined,
+    genre: movie.genres?.map((g) => g.name),
+    description: movie.overview,
+    ...(movie.vote_average > 0 && {
+      aggregateRating: {
+        "@type": "AggregateRating",
+        ratingValue: movie.vote_average.toFixed(1),
+        bestRating: "10",
+        ratingCount: movie.vote_count,
+      },
+    }),
+  };
+
   return (
     <div className="min-h-screen">
+      <SEOHead title={seoTitle} description={seoDesc} canonicalPath={`/movie/${id}`} image={seoImage} jsonLd={jsonLd} />
       {/* Backdrop */}
       {backdropUrl && (
         <div className="absolute inset-0 h-[50vh] overflow-hidden">
