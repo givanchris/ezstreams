@@ -130,6 +130,11 @@ const App = () => (
               }
             />
             <Route path="/upgrade" element={<Upgrade />} />
+            <Route path="/genre/:slug" element={
+              <ProtectedRoute>
+                <GenrePage />
+              </ProtectedRoute>
+            } />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

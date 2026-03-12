@@ -10,6 +10,11 @@ const staticPages = [
   { loc: "/series", priority: "0.8", changefreq: "daily" },
 ];
 
+const genrePages = [
+  "comedy", "horror", "action", "drama", "thriller",
+  "sci-fi", "romance", "animation", "documentary",
+];
+
 async function fetchTmdbIds(endpoint: string, apiKey: string, isBearer: boolean): Promise<number[]> {
   const url = new URL(`${TMDB_BASE_URL}${endpoint}`);
   const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -21,7 +26,6 @@ async function fetchTmdbIds(endpoint: string, apiKey: string, isBearer: boolean)
   }
 
   const ids: number[] = [];
-  // Fetch first 2 pages to get ~40 items per list
   for (let page = 1; page <= 2; page++) {
     url.searchParams.set("page", String(page));
     try {
@@ -49,7 +53,6 @@ serve(async () => {
     const isBearer = apiKey.startsWith("eyJ") || (apiKey.match(/\./g)?.length ?? 0) === 2;
     const today = new Date().toISOString().split("T")[0];
 
-    // Fetch movie and TV IDs in parallel
     const [popularMovies, trendingMovies, popularTv, trendingTv] = await Promise.all([
       fetchTmdbIds("/movie/popular", apiKey, isBearer),
       fetchTmdbIds("/trending/movie/week", apiKey, isBearer),
@@ -65,32 +68,22 @@ serve(async () => {
 
     // Static pages
     for (const page of staticPages) {
-      xml += `  <url>\n`;
-      xml += `    <loc>${SITE_URL}${page.loc}</loc>\n`;
-      xml += `    <lastmod>${today}</lastmod>\n`;
-      xml += `    <changefreq>${page.changefreq}</changefreq>\n`;
-      xml += `    <priority>${page.priority}</priority>\n`;
-      xml += `  </url>\n`;
+      xml += `  <url>\n    <loc>${SITE_URL}${page.loc}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>${page.changefreq}</changefreq>\n    <priority>${page.priority}</priority>\n  </url>\n`;
+    }
+
+    // Genre pages
+    for (const slug of genrePages) {
+      xml += `  <url>\n    <loc>${SITE_URL}/genre/${slug}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.7</priority>\n  </url>\n`;
     }
 
     // Movie detail pages
     for (const id of movieIds) {
-      xml += `  <url>\n`;
-      xml += `    <loc>${SITE_URL}/movie/${id}</loc>\n`;
-      xml += `    <lastmod>${today}</lastmod>\n`;
-      xml += `    <changefreq>weekly</changefreq>\n`;
-      xml += `    <priority>0.6</priority>\n`;
-      xml += `  </url>\n`;
+      xml += `  <url>\n    <loc>${SITE_URL}/movie/${id}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.6</priority>\n  </url>\n`;
     }
 
     // TV detail pages
     for (const id of tvIds) {
-      xml += `  <url>\n`;
-      xml += `    <loc>${SITE_URL}/tv/${id}</loc>\n`;
-      xml += `    <lastmod>${today}</lastmod>\n`;
-      xml += `    <changefreq>weekly</changefreq>\n`;
-      xml += `    <priority>0.6</priority>\n`;
-      xml += `  </url>\n`;
+      xml += `  <url>\n    <loc>${SITE_URL}/tv/${id}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.6</priority>\n  </url>\n`;
     }
 
     xml += `</urlset>`;
