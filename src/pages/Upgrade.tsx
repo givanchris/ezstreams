@@ -8,7 +8,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import Footer from "@/components/Footer";
 
-const PRO_PRICE_ID = "price_1TAXcHPBtt1ZFWAGfjtgGwjM"; // $10/mo
+const PLANS = {
+  monthly: { priceId: "price_1TAXcHPBtt1ZFWAGfjtgGwjM", amount: "$10", interval: "month" },
+  annual: { priceId: "price_1TAZMZPBtt1ZFWAGD5TLzdHw", amount: "$100", interval: "year" },
+};
 
 const BENEFITS = [
   { icon: Sparkles, text: "Unlimited advanced filtering" },
