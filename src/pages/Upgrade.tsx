@@ -105,11 +105,32 @@ const Upgrade = () => {
           </div>
         </div>
 
+        {/* Plan toggle */}
+        <div className="flex justify-center mb-6 animate-fade-up" style={{ animationDelay: "0.12s" }}>
+          <div className="inline-flex rounded-full bg-secondary/50 p-1 gap-1">
+            <button
+              onClick={() => setPlan("monthly")}
+              className={`px-5 py-2 rounded-full text-sm font-medium transition-all ${plan === "monthly" ? "bg-primary text-primary-foreground shadow" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              Monthly
+            </button>
+            <button
+              onClick={() => setPlan("annual")}
+              className={`px-5 py-2 rounded-full text-sm font-medium transition-all ${plan === "annual" ? "bg-primary text-primary-foreground shadow" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              Annual <span className="text-xs opacity-75">Save $20</span>
+            </button>
+          </div>
+        </div>
+
         {/* CTA */}
         <div className="glass-card rounded-2xl p-8 text-center animate-fade-up" style={{ animationDelay: "0.15s" }}>
           <p className="text-4xl font-bold text-foreground mb-1">
-            $10<span className="text-lg font-normal text-muted-foreground">/month</span>
+            {PLANS[plan].amount}<span className="text-lg font-normal text-muted-foreground">/{PLANS[plan].interval}</span>
           </p>
+          {plan === "annual" && (
+            <p className="text-sm text-accent font-medium mb-1">~$8.33/mo — save $20/year</p>
+          )}
           <p className="text-sm text-muted-foreground mb-6">Cancel anytime</p>
 
           <Button
