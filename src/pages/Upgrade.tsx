@@ -26,6 +26,7 @@ const Upgrade = () => {
   const { subscribed } = useSubscription();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [plan, setPlan] = useState<"monthly" | "annual">("monthly");
 
   if (!user) {
     return (
