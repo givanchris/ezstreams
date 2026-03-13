@@ -8,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import Footer from "@/components/Footer";
 
-const PRO_PRICE_ID = "price_1T84mEPBtt1ZFWAGUBqqcyhd"; // $5/mo
+const PRO_PRICE_ID = "price_1TAXcHPBtt1ZFWAGfjtgGwjM"; // $10/mo
 
 const BENEFITS = [
   { icon: Sparkles, text: "Unlimited advanced filtering" },
@@ -104,7 +104,7 @@ const Upgrade = () => {
         {/* CTA */}
         <div className="glass-card rounded-2xl p-8 text-center animate-fade-up" style={{ animationDelay: "0.15s" }}>
           <p className="text-4xl font-bold text-foreground mb-1">
-            $5<span className="text-lg font-normal text-muted-foreground">/month</span>
+            $10<span className="text-lg font-normal text-muted-foreground">/month</span>
           </p>
           <p className="text-sm text-muted-foreground mb-6">Cancel anytime</p>
 
