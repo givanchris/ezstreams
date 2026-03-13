@@ -51,6 +51,8 @@ const UpgradeModal = ({ open, onOpenChange }: UpgradeModalProps) => {
         <div className="text-center mb-2">
           <p className="text-2xl font-bold text-foreground">
             $10<span className="text-sm font-normal text-muted-foreground">/month</span>
+            <span className="text-muted-foreground text-sm font-normal mx-2">or</span>
+            $100<span className="text-sm font-normal text-muted-foreground">/year</span>
           </p>
         </div>
 
