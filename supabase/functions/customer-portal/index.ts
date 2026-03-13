@@ -13,23 +13,24 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-      { auth: { persistSession: false } }
-    );
-
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) throw new Error("No authorization header");
+    if (!authHeader?.startsWith("Bearer ")) throw new Error("No authorization header");
 
     const token = authHeader.replace("Bearer ", "");
-    const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
-    if (userError) throw new Error(`Auth error: ${userError.message}`);
-    const user = userData.user;
-    if (!user?.email) throw new Error("User not authenticated");
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) throw new Error(`Auth error: ${claimsError?.message || "Invalid token"}`);
+
+    const email = claimsData.claims.email as string;
+    if (!email) throw new Error("User not authenticated");
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", { apiVersion: "2025-08-27.basil" });
-    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
+    const customers = await stripe.customers.list({ email, limit: 1 });
     if (customers.data.length === 0) throw new Error("No Stripe customer found");
 
     const origin = req.headers.get("origin") || "https://ezstreams.lovable.app";
