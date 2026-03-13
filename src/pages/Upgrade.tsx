@@ -58,7 +58,7 @@ const Upgrade = () => {
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("create-checkout", {
-        body: { priceId: PRO_PRICE_ID },
+        body: { priceId: PLANS[plan].priceId },
         headers: { Authorization: `Bearer ${session?.access_token}` },
       });
       if (error) throw error;
