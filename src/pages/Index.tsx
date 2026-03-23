@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/AuthContext";
 import SearchAutocomplete from "@/components/SearchAutocomplete";
 import StreamingServiceCard from "@/components/StreamingServiceCard";
 
@@ -77,17 +78,39 @@ const featuredContent = [
   },
 ];
 
+const STORAGE_KEY_PREFIX = "ezstream_subs_";
+
 const Index = () => {
   const navigate = useNavigate();
-  const [connectedServices, setConnectedServices] = useState<string[]>(["netflix", "disney", "hulu", "hbo", "prime", "apple"]);
+  const { user } = useAuth();
+  const [connectedServices, setConnectedServices] = useState<string[]>([]);
   const [homeFilters, setHomeFilters] = useState<SearchFilters>(DEFAULT_FILTERS);
 
+  // Load persisted subscriptions from localStorage
+  useEffect(() => {
+    const key = `${STORAGE_KEY_PREFIX}${user?.id ?? "anon"}`;
+    const saved = localStorage.getItem(key);
+    if (saved) {
+      try {
+        setConnectedServices(JSON.parse(saved));
+      } catch {
+        setConnectedServices(streamingServices.map((s) => s.id));
+      }
+    } else {
+      // Default: all selected for new users
+      setConnectedServices(streamingServices.map((s) => s.id));
+    }
+  }, [user?.id]);
+
   const toggleService = (serviceId: string) => {
-    setConnectedServices((prev) =>
-      prev.includes(serviceId)
+    setConnectedServices((prev) => {
+      const next = prev.includes(serviceId)
         ? prev.filter((id) => id !== serviceId)
-        : [...prev, serviceId]
-    );
+        : [...prev, serviceId];
+      const key = `${STORAGE_KEY_PREFIX}${user?.id ?? "anon"}`;
+      localStorage.setItem(key, JSON.stringify(next));
+      return next;
+    });
   };
 
   const buildFilterParams = (filters: SearchFilters) => {
