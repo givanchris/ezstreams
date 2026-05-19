@@ -16,4 +16,4 @@ Disallow: /login
 Disallow: /signup
 Disallow: /profile
 
-Sitemap: https://axmnqabhawqihkhpatsc.supabase.co/functions/v1/sitemap
+Sitemap: https://kziserbxdcxxffziemni.supabase.co/functions/v1/sitemap

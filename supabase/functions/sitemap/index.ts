@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
-const SITE_URL = "https://ezstreams.lovable.app";
+const SITE_URL = "https://givanchris.github.io/ezstreams";
 
 const staticPages = [
   { loc: "/", priority: "1.0", changefreq: "daily" },

@@ -1,6 +1,6 @@
 import { Helmet } from "react-helmet-async";
 
-const SITE_URL = "https://ezstreams.lovable.app";
+const SITE_URL = "https://givanchris.github.io/ezstreams";
 
 interface SEOHeadProps {
   title: string;
