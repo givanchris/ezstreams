@@ -9,8 +9,8 @@ import { toast } from "@/hooks/use-toast";
 import Footer from "@/components/Footer";
 
 const PLANS = {
-  monthly: { priceId: "price_1TAXcHPBtt1ZFWAGfjtgGwjM", amount: "$10", interval: "month" },
-  annual: { priceId: "price_1TAZMZPBtt1ZFWAGD5TLzdHw", amount: "$100", interval: "year" },
+  monthly: { priceId: import.meta.env.VITE_STRIPE_MONTHLY_PRICE_ID as string, amount: "$10", interval: "month" },
+  annual: { priceId: import.meta.env.VITE_STRIPE_ANNUAL_PRICE_ID as string, amount: "$100", interval: "year" },
 };
 
 const BENEFITS = [

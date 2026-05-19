@@ -9,21 +9,7 @@ import { useSubscription } from "@/contexts/SubscriptionContext";
 import { normalizeProviderCounts } from "@/lib/provider-normalization";
 
 import UpgradeModal from "./UpgradeModal";
-
-const REGIONS = [
-  { code: "US", name: "United States" },
-  { code: "GB", name: "United Kingdom" },
-  { code: "CA", name: "Canada" },
-  { code: "AU", name: "Australia" },
-  { code: "DE", name: "Germany" },
-  { code: "FR", name: "France" },
-  { code: "ES", name: "Spain" },
-  { code: "IT", name: "Italy" },
-  { code: "JP", name: "Japan" },
-  { code: "BR", name: "Brazil" },
-  { code: "MX", name: "Mexico" },
-  { code: "IN", name: "India" },
-];
+import { REGIONS } from "@/lib/regions";
 
 const PROVIDER_COLORS: Record<string, string> = {
   "Netflix": "#E50914",
@@ -40,7 +26,36 @@ const PROVIDER_COLORS: Record<string, string> = {
   "MGM+": "#B8860B",
   "BritBox": "#C4122F",
   "Showtime": "#B40000",
+  "Crunchyroll": "#F47521",
+  "Tubi": "#FA5353",
+  "Mubi": "#00ABAB",
+  "Shudder": "#1C1C1C",
 };
+
+// Monthly subscription costs for savings calculation
+const PROVIDER_COSTS: Record<string, number> = {
+  "Netflix": 15.49,
+  "Disney+": 7.99,
+  "Max": 15.99,
+  "Hulu": 7.99,
+  "Apple TV+": 9.99,
+  "Prime Video": 8.99,
+  "Paramount+": 7.99,
+  "Peacock": 7.99,
+  "Starz": 8.99,
+  "Showtime": 10.99,
+  "AMC+": 8.99,
+  "Discovery+": 4.99,
+  "Crunchyroll": 7.99,
+  "Shudder": 5.99,
+  "MGM+": 5.99,
+  "BritBox": 8.99,
+  "Mubi": 14.99,
+};
+
+function getProviderCost(name: string): number {
+  return PROVIDER_COSTS[name] ?? 9.99;
+}
 
 function getProviderColor(name: string): string {
   return PROVIDER_COLORS[name] || "#6B7280";
@@ -87,10 +102,10 @@ const SavingsAnalyzer = () => {
   const visibleProviders = showAll ? normalizedProviders : normalizedProviders.slice(0, DEFAULT_SHOW);
   const hasMore = normalizedProviders.length > DEFAULT_SHOW;
 
-  // Calculate estimated savings for preview
-  const estimatedSavings = normalizedProviders.length > 1
-    ? Math.round((normalizedProviders.slice(1).reduce((s, p) => s + p.count, 0) / Math.max(stats.totalTitles, 1)) * 15)
-    : 0;
+  // Sum monthly costs of providers the user could cancel (< 20% coverage)
+  const estimatedSavings = normalizedProviders
+    .filter((p) => getRecommendation(p.percent) === "cancel")
+    .reduce((sum, p) => sum + getProviderCost(p.name), 0);
 
   if (!user) {
     return (
@@ -163,9 +178,9 @@ const SavingsAnalyzer = () => {
               {estimatedSavings > 0 && (
                 <div className="p-6 rounded-2xl bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/30 text-center">
                   <p className="text-3xl font-bold text-foreground mb-1">
-                    You could save <span className="text-primary">${estimatedSavings}</span>/month
+                    You could save <span className="text-primary">${estimatedSavings.toFixed(2)}</span>/month
                   </p>
-                  <p className="text-sm text-muted-foreground">on streaming services based on your viewing habits</p>
+                  <p className="text-sm text-muted-foreground">by canceling services with low coverage of your browsing history</p>
                 </div>
               )}
 

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAvailableProviders } from "@/hooks/useAvailableProviders";
 import SearchAutocomplete from "@/components/SearchAutocomplete";
 import StreamingServiceCard from "@/components/StreamingServiceCard";
 
@@ -11,80 +12,25 @@ import TrendingOnYourServices from "@/components/TrendingOnYourServices";
 import DecisionMode from "@/components/DecisionMode";
 import Footer from "@/components/Footer";
 import RecentlyViewedRow from "@/components/RecentlyViewedRow";
-import { ArrowRight, Sparkles, Zap, Shield, PiggyBank } from "lucide-react";
+import { ArrowRight, Sparkles, Zap, Shield, PiggyBank, ChevronDown, ChevronUp, Search, X } from "lucide-react";
 import PopularLists from "@/components/PopularLists";
 import MoodChips, { MoodPreset } from "@/components/MoodChips";
 import SearchFilterBar, { SearchFilters, DEFAULT_FILTERS } from "@/components/SearchFilterBar";
 import { Button } from "@/components/ui/button";
-import { fetchMediaList, tmdbFetch, TMDBMovie, TMDBTvShow, TMDBSearchResponse } from "@/lib/tmdb";
+import { tmdbFetch, TMDBMovie, TMDBTvShow, TMDBSearchResponse } from "@/lib/tmdb";
 
-const streamingServices = [
-  { id: "netflix", name: "Netflix", logo: "N", color: "#E50914" },
-  { id: "disney", name: "Disney+", logo: "D+", color: "#113CCF" },
-  { id: "hbo", name: "HBO Max", logo: "HBO", color: "#5822B4" },
-  { id: "prime", name: "Prime Video", logo: "P", color: "#00A8E1" },
-  { id: "hulu", name: "Hulu", logo: "H", color: "#1CE783" },
-  { id: "apple", name: "Apple TV+", logo: "🍎", color: "#555555" },
-];
-
-const featuredContent = [
-  {
-    title: "Dune: Part Two",
-    image: "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=400&h=600&fit=crop",
-    rating: 8.8,
-    year: "2024",
-    type: "movie" as const,
-    streamingServices: ["HBO Max", "Prime Video"],
-  },
-  {
-    title: "The Bear",
-    image: "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=400&h=600&fit=crop",
-    rating: 8.6,
-    year: "2024",
-    type: "series" as const,
-    streamingServices: ["Hulu", "Disney+"],
-  },
-  {
-    title: "Oppenheimer",
-    image: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=400&h=600&fit=crop",
-    rating: 8.4,
-    year: "2023",
-    type: "movie" as const,
-    streamingServices: ["Peacock", "Prime Video"],
-  },
-  {
-    title: "Shogun",
-    image: "https://images.unsplash.com/photo-1480796927426-f609979314bd?w=400&h=600&fit=crop",
-    rating: 9.0,
-    year: "2024",
-    type: "series" as const,
-    streamingServices: ["Hulu", "Disney+"],
-  },
-  {
-    title: "Poor Things",
-    image: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=400&h=600&fit=crop",
-    rating: 8.3,
-    year: "2023",
-    type: "movie" as const,
-    streamingServices: ["Hulu"],
-  },
-  {
-    title: "Fallout",
-    image: "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400&h=600&fit=crop",
-    rating: 8.5,
-    year: "2024",
-    type: "series" as const,
-    streamingServices: ["Prime Video"],
-  },
-];
 
 const STORAGE_KEY_PREFIX = "ezstream_subs_";
 
 const Index = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [connectedServices, setConnectedServices] = useState<string[]>([]);
+  const [connectedIds, setConnectedIds] = useState<number[]>([]);
   const [homeFilters, setHomeFilters] = useState<SearchFilters>(DEFAULT_FILTERS);
+  const { data: availableProviders = [], isLoading: loadingProviders } = useAvailableProviders();
+  const [serviceSearch, setServiceSearch] = useState("");
+  const [showAllServices, setShowAllServices] = useState(false);
+  const DEFAULT_VISIBLE = 6;
 
   // Load persisted subscriptions from localStorage
   useEffect(() => {
@@ -92,21 +38,18 @@ const Index = () => {
     const saved = localStorage.getItem(key);
     if (saved) {
       try {
-        setConnectedServices(JSON.parse(saved));
+        setConnectedIds(JSON.parse(saved));
       } catch {
-        setConnectedServices(streamingServices.map((s) => s.id));
+        setConnectedIds([]);
       }
-    } else {
-      // Default: all selected for new users
-      setConnectedServices(streamingServices.map((s) => s.id));
     }
   }, [user?.id]);
 
-  const toggleService = (serviceId: string) => {
-    setConnectedServices((prev) => {
-      const next = prev.includes(serviceId)
-        ? prev.filter((id) => id !== serviceId)
-        : [...prev, serviceId];
+  const toggleService = (providerId: number) => {
+    setConnectedIds((prev) => {
+      const next = prev.includes(providerId)
+        ? prev.filter((id) => id !== providerId)
+        : [...prev, providerId];
       const key = `${STORAGE_KEY_PREFIX}${user?.id ?? "anon"}`;
       localStorage.setItem(key, JSON.stringify(next));
       return next;
@@ -139,28 +82,33 @@ const Index = () => {
     navigate(`/search?${params.toString()}`);
   };
 
-  // Fetch trending movies
+  const STREAMING_PARAMS = {
+    with_watch_monetization_types: 'flatrate',
+    watch_region: 'US',
+    sort_by: 'popularity.desc',
+    page: '1',
+    include_adult: 'false',
+  };
+
+  // Trending rows — use discover+streaming so theatrical releases don't appear
   const { data: trendingMovies, isLoading: loadingTrendingMovies } = useQuery({
     queryKey: ['trending-movies-home'],
-    queryFn: () => fetchMediaList<TMDBMovie>('/trending/movie/week', 1),
+    queryFn: () => tmdbFetch<TMDBSearchResponse<TMDBMovie>>('/discover/movie', STREAMING_PARAMS),
     staleTime: 5 * 60 * 1000,
   });
 
-  // Fetch trending TV
   const { data: trendingTv, isLoading: loadingTrendingTv } = useQuery({
     queryKey: ['trending-tv-home'],
-    queryFn: () => fetchMediaList<TMDBTvShow>('/trending/tv/week', 1),
+    queryFn: () => tmdbFetch<TMDBSearchResponse<TMDBTvShow>>('/discover/tv', STREAMING_PARAMS),
     staleTime: 5 * 60 * 1000,
   });
 
-  // Genre discovery rows
+  // Genre discovery rows — streaming filter applied to each
   const { data: topComedies, isLoading: loadingComedies } = useQuery({
     queryKey: ['discover-comedy-home'],
     queryFn: () => tmdbFetch<TMDBSearchResponse<TMDBMovie>>('/discover/movie', {
+      ...STREAMING_PARAMS,
       with_genres: '35',
-      sort_by: 'popularity.desc',
-      page: '1',
-      include_adult: 'false',
     }),
     staleTime: 5 * 60 * 1000,
   });
@@ -168,10 +116,8 @@ const Index = () => {
   const { data: topAction, isLoading: loadingAction } = useQuery({
     queryKey: ['discover-action-home'],
     queryFn: () => tmdbFetch<TMDBSearchResponse<TMDBMovie>>('/discover/movie', {
+      ...STREAMING_PARAMS,
       with_genres: '28',
-      sort_by: 'popularity.desc',
-      page: '1',
-      include_adult: 'false',
     }),
     staleTime: 5 * 60 * 1000,
   });
@@ -179,10 +125,8 @@ const Index = () => {
   const { data: topDrama, isLoading: loadingDrama } = useQuery({
     queryKey: ['discover-drama-home'],
     queryFn: () => tmdbFetch<TMDBSearchResponse<TMDBMovie>>('/discover/movie', {
+      ...STREAMING_PARAMS,
       with_genres: '18',
-      sort_by: 'popularity.desc',
-      page: '1',
-      include_adult: 'false',
     }),
     staleTime: 5 * 60 * 1000,
   });
@@ -244,7 +188,7 @@ const Index = () => {
       {/* Your Services Section */}
       <section className="py-16 px-6">
         <div className="max-w-7xl mx-auto">
-          <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center justify-between mb-6">
             <div>
               <h2 className="font-display text-3xl font-bold text-foreground mb-2">
                 Your Streaming Services
@@ -258,23 +202,70 @@ const Index = () => {
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {streamingServices.map((service, index) => (
-              <div
-                key={service.id}
-                className="animate-fade-up"
-                style={{ animationDelay: `${index * 0.1}s` }}
-              >
-                <StreamingServiceCard
-                  name={service.name}
-                  logo={service.logo}
-                  color={service.color}
-                  connected={connectedServices.includes(service.id)}
-                  onToggle={() => toggleService(service.id)}
-                />
-              </div>
-            ))}
+          {/* Search input */}
+          <div className="relative mb-6 max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search services..."
+              value={serviceSearch}
+              onChange={(e) => { setServiceSearch(e.target.value); setShowAllServices(true); }}
+              className="w-full pl-9 pr-8 py-2 rounded-xl bg-secondary/50 border border-border text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:border-primary/50"
+            />
+            {serviceSearch && (
+              <button onClick={() => setServiceSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
+
+          {loadingProviders ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="h-[88px] rounded-2xl bg-secondary/30 animate-pulse" />
+              ))}
+            </div>
+          ) : (() => {
+            const filtered = serviceSearch
+              ? availableProviders.filter((p) => p.name.toLowerCase().includes(serviceSearch.toLowerCase()))
+              : availableProviders;
+
+            // Always show connected providers; collapse unconnected ones
+            const connected = filtered.filter((p) => connectedIds.includes(p.id));
+            const unconnected = filtered.filter((p) => !connectedIds.includes(p.id));
+            const visibleUnconnected = showAllServices ? unconnected : unconnected.slice(0, Math.max(0, DEFAULT_VISIBLE - connected.length));
+            const displayList = [...connected, ...visibleUnconnected];
+            const hiddenCount = unconnected.length - visibleUnconnected.length;
+
+            return (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {displayList.map((provider, index) => (
+                    <div key={provider.id} className="animate-fade-up" style={{ animationDelay: `${Math.min(index, 5) * 0.05}s` }}>
+                      <StreamingServiceCard
+                        name={provider.name}
+                        logoUrl={provider.logoUrl}
+                        connected={connectedIds.includes(provider.id)}
+                        onToggle={() => toggleService(provider.id)}
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                {!serviceSearch && (hiddenCount > 0 || showAllServices) && (
+                  <button
+                    onClick={() => setShowAllServices(!showAllServices)}
+                    className="mt-4 w-full py-3 flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {showAllServices
+                      ? <><ChevronUp className="w-4 h-4" /> Show fewer services</>
+                      : <><ChevronDown className="w-4 h-4" /> Show {hiddenCount} more services</>
+                    }
+                  </button>
+                )}
+              </>
+            );
+          })()}
         </div>
       </section>
 

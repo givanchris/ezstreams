@@ -12,28 +12,14 @@ import { useProviderTracking } from "@/hooks/useProviderTracking";
 import { getSortedProviders } from "@/lib/provider-utils";
 import Footer from "@/components/Footer";
 import ReviewSection from "@/components/ReviewSection";
-import { 
-  getMovieDetails, 
-  getWatchProviders, 
-  getImageUrl, 
-  TMDBMovie, 
+import {
+  getMovieDetails,
+  getWatchProviders,
+  getImageUrl,
+  TMDBMovie,
   WatchProviderData
 } from "@/lib/tmdb";
-
-const REGIONS = [
-  { code: "US", name: "United States" },
-  { code: "GB", name: "United Kingdom" },
-  { code: "CA", name: "Canada" },
-  { code: "AU", name: "Australia" },
-  { code: "DE", name: "Germany" },
-  { code: "FR", name: "France" },
-  { code: "ES", name: "Spain" },
-  { code: "IT", name: "Italy" },
-  { code: "JP", name: "Japan" },
-  { code: "BR", name: "Brazil" },
-  { code: "MX", name: "Mexico" },
-  { code: "IN", name: "India" },
-];
+import { REGIONS } from "@/lib/regions";
 
 const MovieDetails = () => {
   const { id } = useParams<{ id: string }>();
@@ -349,16 +335,26 @@ const MovieDetails = () => {
                 </p>
                 <AffiliateDisclosure />
               </div>
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-muted-foreground">
-                  No streaming options available for {REGIONS.find(r => r.code === region)?.name || region}.
-                </p>
-                <p className="text-muted-foreground/70 text-sm mt-2">
-                  Try selecting a different region.
-                </p>
-              </div>
-            )}
+            ) : (() => {
+              const daysSinceRelease = movie.release_date
+                ? (Date.now() - new Date(movie.release_date).getTime()) / (1000 * 60 * 60 * 24)
+                : null;
+              const likelyInTheaters = daysSinceRelease !== null && daysSinceRelease >= 0 && daysSinceRelease < 90;
+              return (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">
+                    {likelyInTheaters
+                      ? "This film is likely still in theaters and not yet available for streaming."
+                      : `No streaming options found for ${REGIONS.find(r => r.code === region)?.name || region}.`}
+                  </p>
+                  <p className="text-muted-foreground/70 text-sm mt-2">
+                    {likelyInTheaters
+                      ? "Check back in a few weeks — most films hit streaming 45–90 days after theatrical release."
+                      : "Try selecting a different region."}
+                  </p>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Reviews */}

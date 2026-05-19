@@ -1,5 +1,4 @@
-import { useRef, useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useRef, useCallback, useEffect, useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,6 +7,7 @@ import MediaCard from "@/components/MediaCard";
 import HoverPreview from "@/components/HoverPreview";
 import { useAuth } from "@/contexts/AuthContext";
 import {
+  tmdbFetch,
   fetchMediaList,
   getWatchProviders,
   getTvWatchProviders,
@@ -19,157 +19,145 @@ import {
 } from "@/lib/tmdb";
 import { normalizeProviderName } from "@/lib/provider-normalization";
 
-// Maps subscription IDs → TMDB provider IDs
-const SUB_ID_TO_TMDB: Record<string, number> = {
-  netflix: 8,
-  disney_plus: 337,
-  prime_video: 9,
-  max: 1899,
-  hulu: 15,
-  apple_tv: 350,
-  paramount_plus: 531,
-  peacock: 386,
-};
-
-const SUB_ID_TO_NAME: Record<string, string> = {
-  netflix: "Netflix",
-  disney_plus: "Disney+",
-  prime_video: "Prime Video",
-  max: "Max",
-  hulu: "Hulu",
-  apple_tv: "Apple TV+",
-  paramount_plus: "Paramount+",
-  peacock: "Peacock",
-};
-
 type MediaItem = TMDBMovie | TMDBTvShow;
-
-interface FilteredItem {
-  item: MediaItem;
-  mediaType: "movie" | "tv";
-  providers: { name: string; logo: string }[];
-}
+type ProviderBadge = { name: string; logo: string };
 
 const TrendingOnYourServices = () => {
   const { user } = useAuth();
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [filteredItems, setFilteredItems] = useState<FilteredItem[]>([]);
-  const [filtering, setFiltering] = useState(false);
+  const [providerBadges, setProviderBadges] = useState<Record<string, ProviderBadge[]>>({});
 
-  const getUserServiceIds = useCallback((): string[] => {
+  const getUserTmdbIds = useCallback((): number[] => {
     if (!user?.id) return [];
     const saved = localStorage.getItem(`ezstream_subs_${user.id}`);
     if (!saved) return [];
-    try {
-      return JSON.parse(saved) as string[];
-    } catch {
-      return [];
-    }
+    try { return JSON.parse(saved) as number[]; } catch { return []; }
   }, [user?.id]);
 
-  const userServiceIds = getUserServiceIds();
-  const hasServices = userServiceIds.length > 0;
+  const userTmdbIds = getUserTmdbIds();
+  const hasServices = userTmdbIds.length > 0;
+  const watchProvidersParam = userTmdbIds.join("|");
 
-  // Fetch trending movies and TV
-  const { data: trendingMovies, isLoading: loadingMovies } = useQuery({
-    queryKey: ["trending-movies-services"],
+  // ── No services: show generic trending (2 calls, already cached by home page) ──
+  const { data: trendingMovies, isLoading: loadingTM } = useQuery({
+    queryKey: ["trending-movies-home"],
     queryFn: () => fetchMediaList<TMDBMovie>("/trending/movie/week", 1),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 10 * 60 * 1000,
+    enabled: !hasServices,
   });
 
-  const { data: trendingTv, isLoading: loadingTv } = useQuery({
-    queryKey: ["trending-tv-services"],
+  const { data: trendingTv, isLoading: loadingTT } = useQuery({
+    queryKey: ["trending-tv-home"],
     queryFn: () => fetchMediaList<TMDBTvShow>("/trending/tv/week", 1),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 10 * 60 * 1000,
+    enabled: !hasServices,
   });
 
-  // Filter by user's services
-  useEffect(() => {
-    if (!hasServices) {
-      // Show all trending with no provider badges
-      const movies = (trendingMovies?.results || []).slice(0, 10).map((m) => ({
+  // ── Has services: use discover endpoint pre-filtered by provider (2 calls total) ──
+  const { data: discoverMovies, isLoading: loadingDM } = useQuery({
+    queryKey: ["discover-movies-services", watchProvidersParam],
+    queryFn: () =>
+      tmdbFetch<TMDBSearchResponse<TMDBMovie>>("/discover/movie", {
+        with_watch_providers: watchProvidersParam,
+        watch_region: "US",
+        sort_by: "popularity.desc",
+        page: "1",
+      }),
+    staleTime: 10 * 60 * 1000,
+    enabled: hasServices,
+  });
+
+  const { data: discoverTv, isLoading: loadingDT } = useQuery({
+    queryKey: ["discover-tv-services", watchProvidersParam],
+    queryFn: () =>
+      tmdbFetch<TMDBSearchResponse<TMDBTvShow>>("/discover/tv", {
+        with_watch_providers: watchProvidersParam,
+        watch_region: "US",
+        sort_by: "popularity.desc",
+        page: "1",
+      }),
+    staleTime: 10 * 60 * 1000,
+    enabled: hasServices,
+  });
+
+  const isLoading = hasServices ? loadingDM || loadingDT : loadingTM || loadingTT;
+
+  // Merge and sort by popularity
+  const displayItems = useMemo<{ item: MediaItem; mediaType: "movie" | "tv" }[]>(() => {
+    if (hasServices) {
+      const movies = (discoverMovies?.results || []).slice(0, 15).map((m) => ({
         item: m as MediaItem,
         mediaType: "movie" as const,
-        providers: [],
       }));
-      const tvs = (trendingTv?.results || []).slice(0, 10).map((t) => ({
+      const tvs = (discoverTv?.results || []).slice(0, 15).map((t) => ({
         item: t as MediaItem,
         mediaType: "tv" as const,
-        providers: [],
       }));
-      const combined = [...movies, ...tvs].sort(
-        (a, b) => (b.item.popularity || 0) - (a.item.popularity || 0)
-      );
-      setFilteredItems(combined.slice(0, 15));
+      return [...movies, ...tvs]
+        .sort((a, b) => (b.item.popularity || 0) - (a.item.popularity || 0))
+        .slice(0, 15);
+    }
+    const movies = (trendingMovies?.results || []).slice(0, 10).map((m) => ({
+      item: m as MediaItem,
+      mediaType: "movie" as const,
+    }));
+    const tvs = (trendingTv?.results || []).slice(0, 10).map((t) => ({
+      item: t as MediaItem,
+      mediaType: "tv" as const,
+    }));
+    return [...movies, ...tvs]
+      .sort((a, b) => (b.item.popularity || 0) - (a.item.popularity || 0))
+      .slice(0, 15);
+  }, [hasServices, discoverMovies, discoverTv, trendingMovies, trendingTv]);
+
+  // Fetch provider badges for the top 10 displayed items only (max 2 batch calls)
+  useEffect(() => {
+    if (!hasServices || displayItems.length === 0) {
+      setProviderBadges({});
       return;
     }
 
-    const userTmdbIds = new Set(userServiceIds.map((id) => SUB_ID_TO_TMDB[id]).filter(Boolean));
-
+    const userIdSet = new Set(userTmdbIds);
     let cancelled = false;
-    setFiltering(true);
 
-    async function filterItems() {
-      const allItems: { item: MediaItem; mediaType: "movie" | "tv" }[] = [
-        ...(trendingMovies?.results || []).slice(0, 15).map((m) => ({ item: m as MediaItem, mediaType: "movie" as const })),
-        ...(trendingTv?.results || []).slice(0, 15).map((t) => ({ item: t as MediaItem, mediaType: "tv" as const })),
-      ];
+    async function loadBadges() {
+      const top10 = displayItems.slice(0, 10);
+      const badges: Record<string, ProviderBadge[]> = {};
 
-      const results: FilteredItem[] = [];
-
-      // Process in batches
-      for (let i = 0; i < allItems.length; i += 5) {
+      for (let i = 0; i < top10.length; i += 5) {
         if (cancelled) return;
-        const batch = allItems.slice(i, i + 5);
-        const providerResults = await Promise.allSettled(
+        const batch = top10.slice(i, i + 5);
+        const results = await Promise.allSettled(
           batch.map(({ item, mediaType }) =>
-            mediaType === "movie"
-              ? getWatchProviders(item.id)
-              : getTvWatchProviders(item.id)
+            mediaType === "movie" ? getWatchProviders(item.id) : getTvWatchProviders(item.id)
           )
         );
-
         for (let j = 0; j < batch.length; j++) {
-          const res = providerResults[j];
+          const res = results[j];
           if (res.status !== "fulfilled") continue;
           const flatrate: WatchProvider[] = res.value.results?.US?.flatrate || [];
-          const matchingProviders = flatrate.filter((p) => userTmdbIds.has(p.provider_id));
-          if (matchingProviders.length > 0) {
-            results.push({
-              ...batch[j],
-              providers: matchingProviders.slice(0, 3).map((p) => ({
-                name: normalizeProviderName(p.provider_name),
-                logo: getImageUrl(p.logo_path, "w92") || "",
-              })),
-            });
-          }
+          const matching = flatrate.filter((p) => userIdSet.has(p.provider_id));
+          const key = `${batch[j].mediaType}-${batch[j].item.id}`;
+          badges[key] = matching.slice(0, 3).map((p) => ({
+            name: normalizeProviderName(p.provider_name),
+            logo: getImageUrl(p.logo_path, "w92") || "",
+          }));
         }
       }
 
-      if (!cancelled) {
-        results.sort((a, b) => (b.item.popularity || 0) - (a.item.popularity || 0));
-        setFilteredItems(results.slice(0, 15));
-        setFiltering(false);
-      }
+      if (!cancelled) setProviderBadges(badges);
     }
 
-    if (trendingMovies && trendingTv) {
-      filterItems();
-    }
+    loadBadges();
+    return () => { cancelled = true; };
+  }, [displayItems, hasServices, userTmdbIds.join(",")]);
 
-    return () => {
-      cancelled = true;
-    };
-  }, [trendingMovies, trendingTv, hasServices, userServiceIds.join(",")]);
-
-  const scroll = (direction: "left" | "right") => {
+  const scroll = (dir: "left" | "right") => {
     if (scrollRef.current) {
       const amt = scrollRef.current.clientWidth * 0.75;
-      scrollRef.current.scrollBy({ left: direction === "left" ? -amt : amt, behavior: "smooth" });
+      scrollRef.current.scrollBy({ left: dir === "left" ? -amt : amt, behavior: "smooth" });
     }
   };
-
-  const isLoading = loadingMovies || loadingTv || filtering;
 
   if (isLoading) {
     return (
@@ -190,7 +178,7 @@ const TrendingOnYourServices = () => {
     );
   }
 
-  if (!filteredItems.length) return null;
+  if (!displayItems.length) return null;
 
   return (
     <div className="space-y-4">
@@ -216,10 +204,12 @@ const TrendingOnYourServices = () => {
         className="flex gap-4 overflow-x-auto scrollbar-hide pb-2 -mx-2 px-2"
         style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
-        {filteredItems.map(({ item, mediaType, providers }) => {
+        {displayItems.map(({ item, mediaType }) => {
           const isMovie = "title" in item;
+          const key = `${mediaType}-${item.id}`;
+          const badges = providerBadges[key] || [];
           return (
-            <div key={`${mediaType}-${item.id}`} className="flex-shrink-0 w-36 md:w-44">
+            <div key={key} className="flex-shrink-0 w-36 md:w-44">
               <HoverPreview id={item.id} mediaType={mediaType}>
                 <div className="relative">
                   <MediaCard
@@ -231,17 +221,10 @@ const TrendingOnYourServices = () => {
                     overview={item.overview}
                     mediaType={mediaType}
                   />
-                  {/* Provider badges */}
-                  {providers.length > 0 && (
+                  {badges.length > 0 && (
                     <div className="absolute bottom-[4.5rem] left-2 flex gap-1">
-                      {providers.map((p) => (
-                        <img
-                          key={p.name}
-                          src={p.logo}
-                          alt={p.name}
-                          title={p.name}
-                          className="w-6 h-6 rounded shadow-md"
-                        />
+                      {badges.map((p) => (
+                        <img key={p.name} src={p.logo} alt={p.name} title={p.name} className="w-6 h-6 rounded shadow-md" />
                       ))}
                     </div>
                   )}

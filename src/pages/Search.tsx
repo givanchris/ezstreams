@@ -45,6 +45,7 @@ const Search = () => {
   const [results, setResults] = useState<MultiSearchResult[]>([]);
   const [suggestions, setSuggestions] = useState<MultiSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
@@ -52,6 +53,8 @@ const Search = () => {
   const [top5Only, setTop5Only] = useState(false);
   const [genreMatch, setGenreMatch] = useState<GenreMatch | null>(null);
   const [nlpLabel, setNlpLabel] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   const [filters, setFilters] = useState<SearchFilters>({
     genre: urlGenre,
@@ -99,9 +102,9 @@ const Search = () => {
 
   // Build discover params from filters
   const buildDiscoverParams = useCallback(
-    (genreIds: string, sortBy?: string) => {
+    (genreIds: string, sortBy?: string, pg = 1) => {
       const params: Record<string, string> = {
-        page: "1",
+        page: String(pg),
         include_adult: "false",
         sort_by: sortBy || filters.sort || "popularity.desc",
       };
@@ -118,16 +121,24 @@ const Search = () => {
     [filters]
   );
 
-  // Full search
+  // Full search — append=true for "load more", false for new search
   const runSearch = useCallback(
-    async (searchQuery: string, currentFilters: SearchFilters) => {
+    async (searchQuery: string, currentFilters: SearchFilters, pg = 1, append = false) => {
       const trimmed = searchQuery.trim();
-      setLoading(true);
+      if (append) {
+        setLoadingMore(true);
+      } else {
+        setLoading(true);
+        setPage(1);
+        setTotalPages(1);
+      }
       setError(null);
       setHasSearched(true);
       setShowSuggestions(false);
-      setGenreMatch(null);
-      setNlpLabel(null);
+      if (!append) {
+        setGenreMatch(null);
+        setNlpLabel(null);
+      }
 
       try {
         // Try NLP parsing first
@@ -175,48 +186,47 @@ const Search = () => {
 
         if (useGenreDiscover || (!effectiveQuery && (effectiveFilters.streamingOnly || effectiveFilters.sort))) {
           // Genre / discover mode
-          const movieParams = buildDiscoverParams(discoverGenreIds, effectiveFilters.sort || undefined);
-          const tvParams = buildDiscoverParams(discoverGenreIds, movieParams.sort_by);
+          const movieParams = buildDiscoverParams(discoverGenreIds, effectiveFilters.sort || undefined, pg);
+          const tvParams = buildDiscoverParams(discoverGenreIds, movieParams.sort_by, pg);
 
           const [movieData, tvData] = await Promise.all([
             tmdbFetch<TMDBSearchResponse<MultiSearchResult>>("/discover/movie", movieParams).then(
-              (d) => ({
-                ...d,
-                results: d.results.map((r) => ({ ...r, media_type: "movie" as const })),
-              })
+              (d) => ({ ...d, results: d.results.map((r) => ({ ...r, media_type: "movie" as const })) })
             ),
             tmdbFetch<TMDBSearchResponse<MultiSearchResult>>("/discover/tv", tvParams).then(
-              (d) => ({
-                ...d,
-                results: d.results.map((r) => ({ ...r, media_type: "tv" as const })),
-              })
+              (d) => ({ ...d, results: d.results.map((r) => ({ ...r, media_type: "tv" as const })) })
             ),
           ]);
 
           const combined = [...movieData.results, ...tvData.results];
           combined.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
-          setResults(combined);
+          setTotalPages(Math.min(movieData.total_pages, 500));
+          setResults((prev) => (append ? [...prev, ...combined] : combined));
         } else if (effectiveQuery || trimmed) {
           // Normal title search
           const searchText = effectiveQuery || trimmed;
           const data = await tmdbFetch<TMDBSearchResponse<MultiSearchResult>>(
             "/search/multi",
-            { query: searchText, page: "1", include_adult: "false" }
+            { query: searchText, page: String(pg), include_adult: "false" }
           );
           const filtered = data.results.filter(
             (r): r is MultiSearchResult & { media_type: "movie" | "tv" } =>
               r.media_type === "movie" || r.media_type === "tv"
           );
-          setResults(rankSearchResults(filtered, searchText) as MultiSearchResult[]);
+          const ranked = rankSearchResults(filtered, searchText) as MultiSearchResult[];
+          setTotalPages(Math.min(data.total_pages, 500));
+          setResults((prev) => (append ? [...prev, ...ranked] : ranked));
         } else {
           setResults([]);
+          setTotalPages(1);
         }
       } catch (err) {
         console.error("Search error:", err);
         setError(err instanceof Error ? err.message : "Failed to search");
-        setResults([]);
+        if (!append) setResults([]);
       } finally {
         setLoading(false);
+        setLoadingMore(false);
       }
     },
     [buildDiscoverParams]
@@ -338,6 +348,14 @@ const Search = () => {
     setShowSuggestions(false);
     setGenreMatch(null);
     setNlpLabel(null);
+    setPage(1);
+    setTotalPages(1);
+  };
+
+  const handleLoadMore = () => {
+    const nextPage = page + 1;
+    setPage(nextPage);
+    runSearch(urlQuery, filters, nextPage, true);
   };
 
   const handleSuggestionClick = (item: MultiSearchResult) => {
@@ -608,6 +626,22 @@ const Search = () => {
                   />
                 ))}
               </div>
+
+              {/* Load More */}
+              {!top5Only && page < totalPages && (
+                <div className="flex justify-center mt-8">
+                  <button
+                    onClick={handleLoadMore}
+                    disabled={loadingMore}
+                    className="flex items-center gap-2 px-6 py-3 rounded-full bg-secondary/50 border border-border text-sm font-medium text-foreground hover:bg-secondary/80 transition-colors disabled:opacity-50"
+                  >
+                    {loadingMore ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : null}
+                    {loadingMore ? "Loading…" : `Load more results`}
+                  </button>
+                </div>
+              )}
             </>
           )}
 

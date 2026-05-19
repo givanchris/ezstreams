@@ -18,7 +18,6 @@ import Lists from "./pages/Lists";
 import Subscriptions from "./pages/Subscriptions";
 import Profile from "./pages/Profile";
 import MovieDetails from "./pages/MovieDetails";
-import SeriesDetails from "./pages/SeriesDetails";
 import TvDetails from "./pages/TvDetails";
 import NotFound from "./pages/NotFound";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
@@ -97,14 +96,6 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <MovieDetails />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/series/:id"
-              element={
-                <ProtectedRoute>
-                  <SeriesDetails />
                 </ProtectedRoute>
               }
             />

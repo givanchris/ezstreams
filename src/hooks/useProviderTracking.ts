@@ -58,13 +58,29 @@ function setCachedProviders(key: string, providers: string[]): void {
   }
 }
 
-// Simple concurrency limiter
+// Simple concurrency limiter with timeout safety
 let pending = false;
+let pendingTimeout: ReturnType<typeof setTimeout> | null = null;
 const queue: (() => void)[] = [];
+
+function setPending(value: boolean) {
+  pending = value;
+  if (pendingTimeout) {
+    clearTimeout(pendingTimeout);
+    pendingTimeout = null;
+  }
+  if (value) {
+    // Safety: reset pending after 15s so a hung request never stalls the queue
+    pendingTimeout = setTimeout(() => {
+      pending = false;
+      processQueue();
+    }, 15_000);
+  }
+}
 
 function processQueue() {
   if (pending || queue.length === 0) return;
-  pending = true;
+  setPending(true);
   const next = queue.shift()!;
   next();
 }
@@ -284,7 +300,7 @@ export function useProviderTracking(region: string = "US") {
             lastTrackResult = result;
             resolve(result);
           } finally {
-            pending = false;
+            setPending(false);
             processQueue();
           }
         };

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import MediaCard from "@/components/MediaCard";
-import { fetchMediaList, TMDBMovie, TMDBTvShow, TMDBSearchResponse } from "@/lib/tmdb";
+import { tmdbFetch, TMDBMovie, TMDBTvShow, TMDBSearchResponse } from "@/lib/tmdb";
 
 type MediaType = "movie" | "tv";
 
@@ -13,6 +13,7 @@ interface TabDefinition {
   value: string;
   label: string;
   endpoint: string;
+  params?: Record<string, string>;
 }
 
 interface TabbedMediaGridProps {
@@ -22,25 +23,32 @@ interface TabbedMediaGridProps {
   icon: "movie" | "tv";
 }
 
+// All browse tabs use discover with streaming filter — no theatrical results
+const STREAMING = {
+  with_watch_monetization_types: "flatrate",
+  watch_region: "US",
+  include_adult: "false",
+};
+
 const DEFAULT_TABS_MOVIE: TabDefinition[] = [
-  { value: "trending", label: "Trending", endpoint: "/trending/movie/week" },
-  { value: "popular", label: "Popular", endpoint: "/movie/popular" },
-  { value: "top-rated", label: "Top Rated", endpoint: "/movie/top_rated" },
+  { value: "trending", label: "Trending", endpoint: "/discover/movie", params: { sort_by: "popularity.desc", ...STREAMING } },
+  { value: "top-rated", label: "Top Rated", endpoint: "/discover/movie", params: { sort_by: "vote_average.desc", "vote_count.gte": "300", ...STREAMING } },
+  { value: "new", label: "New Releases", endpoint: "/discover/movie", params: { sort_by: "primary_release_date.desc", ...STREAMING } },
 ];
 
 const DEFAULT_TABS_TV: TabDefinition[] = [
-  { value: "trending", label: "Trending", endpoint: "/trending/tv/week" },
-  { value: "popular", label: "Popular", endpoint: "/tv/popular" },
-  { value: "top-rated", label: "Top Rated", endpoint: "/tv/top_rated" },
+  { value: "trending", label: "Trending", endpoint: "/discover/tv", params: { sort_by: "popularity.desc", ...STREAMING } },
+  { value: "top-rated", label: "Top Rated", endpoint: "/discover/tv", params: { sort_by: "vote_average.desc", "vote_count.gte": "100", ...STREAMING } },
+  { value: "new", label: "New Releases", endpoint: "/discover/tv", params: { sort_by: "first_air_date.desc", ...STREAMING } },
 ];
 
 export function getDefaultTabs(mediaType: MediaType): TabDefinition[] {
   return mediaType === "movie" ? DEFAULT_TABS_MOVIE : DEFAULT_TABS_TV;
 }
 
-const TabbedMediaGrid = ({ 
-  mediaType, 
-  tabs, 
+const TabbedMediaGrid = ({
+  mediaType,
+  tabs,
   title,
   icon
 }: TabbedMediaGridProps) => {
@@ -52,9 +60,12 @@ const TabbedMediaGrid = ({
 
   const { data, isLoading, error, isFetching } = useQuery({
     queryKey: ['media', mediaType, activeTab, currentPage],
-    queryFn: () => fetchMediaList<TMDBMovie | TMDBTvShow>(currentTab.endpoint, currentPage),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
+    queryFn: () => tmdbFetch<TMDBSearchResponse<TMDBMovie | TMDBTvShow>>(
+      currentTab.endpoint,
+      { page: String(currentPage), ...(currentTab.params || {}) }
+    ),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   });
 
   const handlePageChange = (newPage: number) => {
