@@ -7,10 +7,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const logStep = (step: string, details?: any) => {
-  console.log(`[CHECK-SUBSCRIPTION] ${step}${details ? ` - ${JSON.stringify(details)}` : ""}`);
-};
-
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -21,8 +17,6 @@ serve(async (req) => {
     if (!authHeader?.startsWith("Bearer ")) throw new Error("No authorization header");
 
     const token = authHeader.replace("Bearer ", "");
-
-    // Use anon key client with getClaims for Lovable Cloud compatibility
     const anonClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_ANON_KEY") ?? "",
@@ -32,42 +26,65 @@ serve(async (req) => {
     const { data: claimsData, error: claimsError } = await anonClient.auth.getClaims(token);
     if (claimsError || !claimsData?.claims) throw new Error(`Auth error: ${claimsError?.message || "Invalid token"}`);
 
+    const userId = claimsData.claims.sub as string;
     const email = claimsData.claims.email as string;
-    if (!email) throw new Error("User not authenticated");
-    logStep("User authenticated", { email });
+    if (!userId || !email) throw new Error("User not authenticated");
 
+    // Use service role client to read/write profiles
+    const serviceClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
+
+    // Check DB first — fastest path for returning Pro users
+    const { data: profile } = await serviceClient
+      .from("profiles")
+      .select("pro_purchased_at")
+      .eq("id", userId)
+      .single();
+
+    if (profile?.pro_purchased_at) {
+      return new Response(JSON.stringify({ subscribed: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Not in DB yet — check Stripe for a completed one-time payment session
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", { apiVersion: "2025-08-27.basil" });
     const customers = await stripe.customers.list({ email, limit: 1 });
 
     if (customers.data.length === 0) {
-      logStep("No Stripe customer found");
       return new Response(JSON.stringify({ subscribed: false }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const customerId = customers.data[0].id;
-    const subscriptions = await stripe.subscriptions.list({ customer: customerId, status: "active", limit: 1 });
-    const hasActiveSub = subscriptions.data.length > 0;
-    let subscriptionEnd = null;
-    let priceAmount = null;
+    const sessions = await stripe.checkout.sessions.list({
+      customer: customerId,
+      limit: 20,
+    });
 
-    if (hasActiveSub) {
-      const sub = subscriptions.data[0];
-      subscriptionEnd = new Date(sub.current_period_end * 1000).toISOString();
-      priceAmount = sub.items.data[0].price.unit_amount;
-      logStep("Active subscription", { end: subscriptionEnd, amount: priceAmount });
+    const hasPurchased = sessions.data.some(
+      (s) => s.payment_status === "paid" && s.mode === "payment"
+    );
+
+    if (hasPurchased) {
+      // Cache result in DB so future checks skip Stripe entirely
+      await serviceClient
+        .from("profiles")
+        .update({ pro_purchased_at: new Date().toISOString() })
+        .eq("id", userId);
+
+      return new Response(JSON.stringify({ subscribed: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    return new Response(JSON.stringify({
-      subscribed: hasActiveSub,
-      subscription_end: subscriptionEnd,
-      price_amount: priceAmount,
-    }), {
+    return new Response(JSON.stringify({ subscribed: false }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
-    logStep("ERROR", { message: error.message });
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,

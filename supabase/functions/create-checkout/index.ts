@@ -39,14 +39,14 @@ serve(async (req) => {
       customerId = customers.data[0].id;
     }
 
-    const origin = req.headers.get("origin") || "https://ezstreams.lovable.app";
+    const origin = req.headers.get("origin") || "https://givanchris.github.io/ezstreams";
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       customer_email: customerId ? undefined : email,
       line_items: [{ price: priceId, quantity: 1 }],
-      mode: "subscription",
-      success_url: `${origin}/profile?subscription=success`,
+      mode: "payment",
+      success_url: `${origin}/profile?purchase=success`,
       cancel_url: `${origin}/upgrade`,
     });
 

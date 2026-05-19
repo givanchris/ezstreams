@@ -43,30 +43,9 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
-            <Route
-              path="/search"
-              element={
-                <ProtectedRoute>
-                  <Search />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/movies"
-              element={
-                <ProtectedRoute>
-                  <Movies />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/series"
-              element={
-                <ProtectedRoute>
-                  <Series />
-                </ProtectedRoute>
-              }
-            />
+            <Route path="/search" element={<Search />} />
+            <Route path="/movies" element={<Movies />} />
+            <Route path="/series" element={<Series />} />
             <Route
               path="/lists"
               element={
@@ -91,22 +70,8 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/movie/:id"
-              element={
-                <ProtectedRoute>
-                  <MovieDetails />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/tv/:id"
-              element={
-                <ProtectedRoute>
-                  <TvDetails />
-                </ProtectedRoute>
-              }
-            />
+            <Route path="/movie/:id" element={<MovieDetails />} />
+            <Route path="/tv/:id" element={<TvDetails />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/contact" element={<Contact />} />
@@ -121,11 +86,7 @@ const App = () => (
               }
             />
             <Route path="/upgrade" element={<Upgrade />} />
-            <Route path="/genre/:slug" element={
-              <ProtectedRoute>
-                <GenrePage />
-              </ProtectedRoute>
-            } />
+            <Route path="/genre/:slug" element={<GenrePage />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

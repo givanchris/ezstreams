@@ -9,6 +9,7 @@ import AffiliateDisclosure from "@/components/AffiliateDisclosure";
 import WatchlistButton from "@/components/WatchlistButton";
 import { useRecentlyViewed } from "@/hooks/useRecentlyViewed";
 import { useProviderTracking } from "@/hooks/useProviderTracking";
+import { useAuth } from "@/contexts/AuthContext";
 import { getSortedProviders } from "@/lib/provider-utils";
 import Footer from "@/components/Footer";
 import ReviewSection from "@/components/ReviewSection";
@@ -28,6 +29,7 @@ const MovieDetails = () => {
   const [region, setRegion] = useState("US");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
   const { addItem } = useRecentlyViewed();
   const { trackTitle } = useProviderTracking(region);
   const trackedRef = useRef<Set<string>>(new Set());
@@ -225,14 +227,16 @@ const MovieDetails = () => {
                 {movie.tagline && (
                   <p className="text-muted-foreground text-lg italic">"{movie.tagline}"</p>
                 )}
-                <div className="mt-4">
-                  <WatchlistButton
-                    mediaId={movie.id}
-                    mediaType="movie"
-                    title={movie.title}
-                    posterPath={movie.poster_path}
-                  />
-                </div>
+                {user && (
+                  <div className="mt-4">
+                    <WatchlistButton
+                      mediaId={movie.id}
+                      mediaType="movie"
+                      title={movie.title}
+                      posterPath={movie.poster_path}
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-wrap items-center gap-4 text-sm">
@@ -358,9 +362,11 @@ const MovieDetails = () => {
           </div>
 
           {/* Reviews */}
-          <div className="mt-8">
-            <ReviewSection tmdbId={parseInt(id!)} mediaType="movie" />
-          </div>
+          {user && (
+            <div className="mt-8">
+              <ReviewSection tmdbId={parseInt(id!)} mediaType="movie" />
+            </div>
+          )}
         </div>
       </div>
       <Footer />

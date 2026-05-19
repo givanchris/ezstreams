@@ -109,18 +109,15 @@ export async function tmdbFetch<T>(endpoint: string, params: Record<string, stri
 
   const projectUrl = import.meta.env.VITE_SUPABASE_URL;
   
-  // Get the current user's session token for authenticated requests
+  // Use session token when available, fall back to anon key for public browsing
   const { data: { session } } = await supabase.auth.getSession();
-  
-  if (!session?.access_token) {
-    throw new Error('Authentication required. Please log in to browse content.');
-  }
-  
+  const authToken = session?.access_token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
   const response = await fetch(
     `${projectUrl}/functions/v1/tmdb-proxy?${searchParams.toString()}`,
     {
       headers: {
-        'Authorization': `Bearer ${session.access_token}`,
+        'Authorization': `Bearer ${authToken}`,
         'Content-Type': 'application/json',
       },
     }

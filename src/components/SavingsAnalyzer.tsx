@@ -61,6 +61,20 @@ function getProviderColor(name: string): string {
   return PROVIDER_COLORS[name] || "#6B7280";
 }
 
+function getCostPerView(name: string, count: number): number | null {
+  if (count === 0) return null;
+  const cost = PROVIDER_COSTS[name];
+  if (!cost) return null;
+  return cost / count;
+}
+
+function getCancelRecommendation(costPerView: number | null, monthlyCost: number): "keep" | "consider" | "cancel" {
+  if (costPerView === null) return "consider";
+  if (costPerView <= 0.50) return "keep";
+  if (costPerView <= 2.00) return "consider";
+  return "cancel";
+}
+
 function getRecommendation(percent: number): "keep" | "consider" | "cancel" {
   if (percent >= 50) return "keep";
   if (percent >= 20) return "consider";
@@ -175,25 +189,32 @@ const SavingsAnalyzer = () => {
           {!subscribed && (
             <>
               {/* Savings teaser */}
-              {estimatedSavings > 0 && (
-                <div className="p-6 rounded-2xl bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/30 text-center">
-                  <p className="text-3xl font-bold text-foreground mb-1">
-                    You could save <span className="text-primary">${estimatedSavings.toFixed(2)}</span>/month
-                  </p>
-                  <p className="text-sm text-muted-foreground">by canceling services with low coverage of your browsing history</p>
-                </div>
-              )}
+              <div className="p-6 rounded-2xl bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/30 text-center">
+                {estimatedSavings > 0 ? (
+                  <>
+                    <p className="text-3xl font-bold text-foreground mb-1">
+                      You could save <span className="text-primary">${estimatedSavings.toFixed(2)}</span>/month
+                    </p>
+                    <p className="text-sm text-muted-foreground">based on {stats.totalTitles} titles you've explored — unlock to see which services to cut</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-lg font-semibold text-foreground mb-1">Keep browsing to build your profile</p>
+                    <p className="text-sm text-muted-foreground">After exploring more titles, we'll show you exactly which subscriptions to cancel.</p>
+                  </>
+                )}
+              </div>
 
-              {/* Show top provider only (blurred rest) */}
+              {/* Show top provider only */}
               {normalizedProviders.length > 0 && (
-                <ProviderRow provider={normalizedProviders[0]} totalTitles={stats.totalTitles} />
+                <ProviderRow provider={normalizedProviders[0]} totalTitles={stats.totalTitles} showCostPerView={false} />
               )}
 
               {/* Locked / blurred section */}
               <div className="relative">
                 <div className="space-y-4 blur-sm pointer-events-none select-none" aria-hidden="true">
                   {normalizedProviders.slice(1, 4).map((provider) => (
-                    <ProviderRow key={provider.name} provider={provider} totalTitles={stats.totalTitles} />
+                    <ProviderRow key={provider.name} provider={provider} totalTitles={stats.totalTitles} showCostPerView={false} />
                   ))}
                 </div>
 
@@ -206,13 +227,14 @@ const SavingsAnalyzer = () => {
                     Unlock the full analysis
                   </h4>
                   <ul className="text-sm text-muted-foreground space-y-1 mb-4 text-left">
-                    <li>• Which subscriptions you can cancel</li>
-                    <li>• Overlapping streaming services</li>
-                    <li>• Optimized streaming plan</li>
+                    <li>• Cost-per-view for every service you have</li>
+                    <li>• Which subscriptions to cancel</li>
+                    <li>• Personalized cancel recommendations</li>
                   </ul>
                   <Button variant="hero" size="default" onClick={() => setUpgradeOpen(true)}>
-                    <Lock className="w-4 h-4 mr-1" /> View Full Analysis
+                    <Lock className="w-4 h-4 mr-1" /> Unlock Pro — $4.99
                   </Button>
+                  <p className="text-xs text-muted-foreground mt-2">One-time purchase · no subscription</p>
                 </div>
               </div>
             </>
@@ -222,7 +244,7 @@ const SavingsAnalyzer = () => {
           {subscribed && (
             <>
               {visibleProviders.map((provider) => (
-                <ProviderRow key={provider.name} provider={provider} totalTitles={stats.totalTitles} />
+                <ProviderRow key={provider.name} provider={provider} totalTitles={stats.totalTitles} showCostPerView={true} />
               ))}
 
               {hasMore && (
@@ -257,8 +279,12 @@ const SavingsAnalyzer = () => {
 };
 
 /** Single provider row — extracted for reuse */
-function ProviderRow({ provider, totalTitles }: { provider: { name: string; count: number; percent: number }; totalTitles: number }) {
-  const rec = getRecommendation(provider.percent);
+function ProviderRow({ provider, totalTitles, showCostPerView }: { provider: { name: string; count: number; percent: number }; totalTitles: number; showCostPerView: boolean }) {
+  const costPerView = getCostPerView(provider.name, provider.count);
+  const monthlyCost = getProviderCost(provider.name);
+  const rec = showCostPerView
+    ? getCancelRecommendation(costPerView, monthlyCost)
+    : getRecommendation(provider.percent);
   const styles = recStyles[rec];
   const Icon = styles.icon;
   const color = getProviderColor(provider.name);
@@ -272,6 +298,11 @@ function ProviderRow({ provider, totalTitles }: { provider: { name: string; coun
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 mb-2">
             <h4 className="font-display font-semibold text-foreground">{provider.name}</h4>
+            {showCostPerView && costPerView !== null && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
+                ${costPerView.toFixed(2)}/title
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-3">
             <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
@@ -279,7 +310,10 @@ function ProviderRow({ provider, totalTitles }: { provider: { name: string; coun
             </div>
             <span className="text-sm font-medium text-foreground w-12 text-right">{provider.percent}%</span>
           </div>
-          <p className="text-sm text-muted-foreground mt-1">{provider.count} of {totalTitles} explored titles available</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            {provider.count} of {totalTitles} explored titles available
+            {showCostPerView && ` · $${monthlyCost.toFixed(2)}/mo`}
+          </p>
         </div>
         <div className={`flex items-center gap-2 px-4 py-2 rounded-full ${styles.bg} border ${styles.border}`}>
           <Icon className={`w-4 h-4 ${styles.text}`} />
