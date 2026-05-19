@@ -29,26 +29,35 @@ serve(async (req) => {
       );
     }
 
-    // Create Supabase client and verify the JWT
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
-    );
-
     const token = authHeader.replace('Bearer ', '');
-    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
-    
-    if (claimsError || !claimsData?.claims) {
-      console.error("JWT verification failed:", claimsError?.message);
-      return new Response(
-        JSON.stringify({ error: "Unauthorized - Invalid token" }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
 
-    const userId = claimsData.claims.sub;
-    console.log(`Authenticated request from user: ${userId}`);
+    let userId = 'anonymous';
+
+    if (token === anonKey) {
+      // Anon key — allow public/unauthenticated access
+      console.log('Anonymous request via anon key');
+    } else {
+      // Verify as a user JWT
+      const supabase = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        anonKey,
+        { global: { headers: { Authorization: authHeader } } }
+      );
+
+      const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+
+      if (claimsError || !claimsData?.claims) {
+        console.error("JWT verification failed:", claimsError?.message);
+        return new Response(
+          JSON.stringify({ error: "Unauthorized - Invalid token" }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      userId = claimsData.claims.sub;
+      console.log(`Authenticated request from user: ${userId}`);
+    }
 
     // === API KEY CHECK ===
     const apiKey = Deno.env.get('TMDB_API_KEY');
